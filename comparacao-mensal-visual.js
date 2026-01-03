@@ -102,7 +102,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Variáveis globais
     let currentCenter;
-    let codeCoverageChart, bugsChart, leadTimeChart, overallHealthChart, qaValueChart, qaRoiChart, reworkChart, automatedTestsChart, bugsSeverityChart;
+    let codeCoverageChart, bugsChart, leadTimeChart, overallHealthChart, reworkChart, automatedTestsChart, bugsSeverityChart, testCasesPerUsChart;
+    let currentSort = { column: null, direction: 'asc' };
+    let currentTrendMetrics = [];
     
     // Configurar listeners para controles
     document.getElementById('product-select').addEventListener('change', function() {
@@ -113,6 +115,20 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('save-pdf-btn').addEventListener('click', saveToPDF);
     document.getElementById('return-btn').addEventListener('click', function() {
         window.location.href = 'relatorio-mensal.html';
+    });
+
+    // Configurar listeners para ordenação da tabela
+    document.querySelectorAll('.trend-table th[data-sort]').forEach(th => {
+        th.addEventListener('click', () => {
+            const column = th.dataset.sort;
+            if (currentSort.column === column) {
+                currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSort.column = column;
+                currentSort.direction = 'asc';
+            }
+            renderTrendTable();
+        });
     });
     
     // Carregar dados iniciais
@@ -148,9 +164,8 @@ document.addEventListener('DOMContentLoaded', function() {
         updateBugsSeverityChart();
         updateReworkChart();
         updateLeadTimeChart();
-        updateQaValueChart();
-        updateQaRoiChart();
         updateAutomatedTestsChart();
+        updateTestCasesPerUsChart();
         updateTrendAnalysis();
     }
     
@@ -203,8 +218,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const months = Object.keys(dadosRelatorio).filter(month => 
             month !== 'historico' && dadosRelatorio[month][currentCenter]
         ).sort();
-        // Retorna todos os meses disponíveis para exibir o histórico completo nos gráficos
-        return months;
+        // Retorna os últimos 12 meses disponíveis para exibir o histórico recente
+        return months.slice(-12);
     }
     
     // Função para formatar mês para exibição
@@ -249,6 +264,7 @@ document.addEventListener('DOMContentLoaded', function() {
             overallHealthChart.data.datasets[0].data = healthScores10;
             overallHealthChart.data.datasets[0].borderColor = colorStart.replace('0.6', '1');
             overallHealthChart.data.datasets[0].backgroundColor = gradient;
+            overallHealthChart.options.plugins.title.text = `Índice de Qualidade Geral - ${currentCenter === 'Integracoes' ? 'Integrações' : currentCenter}`;
             overallHealthChart.update();
             return;
         }
@@ -896,160 +912,63 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Gráfico de Análise de Valor QA
-    function updateQaValueChart() {
-        const canvas = document.getElementById('qa-value-chart');
+    // Gráfico de Média de Casos de Teste por US
+    function updateTestCasesPerUsChart() {
+        const canvas = document.getElementById('test-cases-per-us-chart');
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
         const months = getAvailableMonths();
+        const TARGET = 3;
 
-        const valoresAtividades = [];
-        const custos = [];
+        const avgData = [];
 
         months.forEach(month => {
             const centerData = dadosRelatorio[month]?.[currentCenter];
-            let custoQaMes = 0;
-            let valorAtividadesMes = 0;
+            let totalUS = 0;
+            let totalCTs = 0;
 
             if (centerData) {
-                const { sprint1, sprint2 } = centerData;
-                custoQaMes = centerData.qaValor || 0;
+                const s1 = centerData.sprint1 || {};
+                const s2 = centerData.sprint2 || {};
                 
-                const ganhosMes = calcularGanhosSprint(sprint1) + calcularGanhosSprint(sprint2);
-                const prejuizoMes = calcularPrejuizoSprint(sprint1) + calcularPrejuizoSprint(sprint2);
-                valorAtividadesMes = ganhosMes - prejuizoMes;
+                totalUS = (s1.usSprint || 0) + (s2.usSprint || 0);
+                totalCTs = (s1.casosTestePorUs || 0) + (s2.casosTestePorUs || 0);
             }
 
-            valoresAtividades.push(valorAtividadesMes);
-            custos.push(custoQaMes);
+            const avg = totalUS > 0 ? (totalCTs / totalUS) : 0;
+            avgData.push(avg);
         });
 
-        if (qaValueChart) {
-            qaValueChart.data.labels = months.map(formatMonth);
-            qaValueChart.data.datasets[0].data = valoresAtividades;
-            qaValueChart.data.datasets[1].data = custos;
-            qaValueChart.update();
+        if (testCasesPerUsChart) {
+            testCasesPerUsChart.data.labels = months.map(formatMonth);
+            testCasesPerUsChart.data.datasets[0].data = avgData;
+            testCasesPerUsChart.data.datasets[1].data = Array(months.length).fill(TARGET);
+            testCasesPerUsChart.update();
             return;
         }
 
-        qaValueChart = new Chart(ctx, {
+        testCasesPerUsChart = new Chart(ctx, {
             type: 'bar',
             data: {
                 labels: months.map(formatMonth),
                 datasets: [{
-                    label: 'Valor das Atividades (R$)',
-                    data: valoresAtividades,
-                    backgroundColor: 'rgba(0, 167, 157, 0.7)', // Sura Green
-                    borderRadius: 6,
-                    borderWidth: 0
+                    label: 'Média de CTs por US',
+                    data: avgData,
+                    backgroundColor: 'rgba(155, 89, 182, 0.7)', // Purple
+                    borderColor: 'rgba(155, 89, 182, 1)',
+                    borderWidth: 1,
+                    borderRadius: 5,
+                    order: 2
                 }, {
-                    label: 'Custo QA (R$)',
-                    data: custos,
-                    backgroundColor: 'rgba(231, 76, 60, 0.7)', // Vermelho
-                    borderRadius: 6,
-                    borderWidth: 0
-                }]
-            },
-            options: {
-                layout: { padding: { top: 25 } },
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        type: 'linear',
-                        position: 'left',
-                        title: { display: true, text: 'Valor (R$)', font: { weight: 'bold', size: 14 } },
-                        grid: { borderDash: [5, 5], color: 'rgba(0,0,0,0.05)' }
-                    },
-                    x: { grid: { display: false } }
-                },
-                plugins: { 
-                    title: { display: true, text: 'Análise de Valor (Custo QA vs. Valor das Atividades)' }, 
-                    datalabels: {
-                        display: true,
-                        anchor: (context) => context.dataset.data[context.dataIndex] >= 0 ? 'end' : 'start',
-                        align: (context) => context.dataset.data[context.dataIndex] >= 0 ? 'top' : 'bottom',
-                        font: { weight: 'bold', size: 12 },
-                        formatter: (value) => {
-                            if (value === 0) return '';
-                            return 'R$ ' + Math.round(value).toLocaleString('pt-BR');
-                        },
-                        color: (context) => {
-                            const value = context.dataset.data[context.dataIndex];
-                            return value >= 0 ? '#333' : '#e74c3c';
-                        }
-                    },
-                    legend: {
-                        position: 'bottom',
-                    }
-                }
-            }
-        });
-    }
-
-    // Gráfico de ROI
-    function updateQaRoiChart() {
-        const canvas = document.getElementById('qa-roi-chart');
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        const months = getAvailableMonths();
-
-        const rois = [];
-
-        months.forEach(month => {
-            const centerData = dadosRelatorio[month]?.[currentCenter];
-            let custoQaMes = 0;
-            let valorAtividadesMes = 0;
-
-            if (centerData) {
-                const { sprint1, sprint2 } = centerData;
-                custoQaMes = centerData.qaValor || 0;
-                const ganhosMes = calcularGanhosSprint(sprint1) + calcularGanhosSprint(sprint2);
-                const prejuizoMes = calcularPrejuizoSprint(sprint1) + calcularPrejuizoSprint(sprint2);
-                valorAtividadesMes = ganhosMes - prejuizoMes;
-            }
-            
-            let roi = 0;
-            if (custoQaMes > 0) {
-                roi = ((valorAtividadesMes - custoQaMes) / custoQaMes) * 100;
-            } else if (valorAtividadesMes > 0) {
-                roi = 500; // Limita em 500% para melhor visualização se o custo for 0
-            }
-
-            rois.push(roi);
-        });
-
-        if (qaRoiChart) {
-            qaRoiChart.data.labels = months.map(formatMonth);
-            qaRoiChart.data.datasets[0].data = rois;
-            qaRoiChart.update();
-            return;
-        }
-
-        qaRoiChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: months.map(formatMonth),
-                datasets: [{
-                    label: 'ROI (%)',
-                    data: rois,
-                    borderColor: (context) => {
-                        const value = context.dataset.data[context.dataIndex];
-                        return value >= 0 ? 'rgba(0, 167, 157, 1)' : 'rgba(231, 76, 60, 1)';
-                    },
-                    segment: {
-                        borderColor: ctx => ctx.p0.raw >= 0 && ctx.p1.raw >= 0 ? 'rgba(0, 167, 157, 1)' : (ctx.p0.raw < 0 && ctx.p1.raw < 0 ? 'rgba(231, 76, 60, 1)' : 'rgba(88, 89, 91, 1)'),
-                    },
-                    tension: 0.3,
-                    fill: false,
-                }, {
-                    label: 'Ponto de Equilíbrio',
-                    data: Array(months.length).fill(0),
-                    borderColor: 'rgba(88, 89, 91, 0.8)', // Sura Gray
+                    type: 'line',
+                    label: `Meta (${TARGET})`,
+                    data: Array(months.length).fill(TARGET),
+                    borderColor: 'rgba(0, 167, 157, 1)', // Sura Green
+                    borderWidth: 2,
                     borderDash: [5, 5],
                     pointRadius: 0,
                     fill: false,
-                    borderWidth: 2,
+                    order: 1
                 }]
             },
             options: {
@@ -1058,28 +977,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 maintainAspectRatio: false,
                 scales: {
                     y: {
-                        title: { display: true, text: 'ROI (%)', font: { weight: 'bold', size: 14 } },
-                        ticks: {
-                            callback: function(value) {
-                                return value + '%';
-                            }
-                        },
+                        beginAtZero: true,
+                        title: { display: true, text: 'CTs / US', font: { weight: 'bold', size: 14 } },
                         grid: { borderDash: [5, 5], color: 'rgba(0,0,0,0.05)' }
                     },
                     x: { grid: { display: false } }
                 },
-                plugins: { 
-                    title: { display: true, text: 'Evolução do Retorno sobre Investimento (ROI)' }, 
+                plugins: {
+                    title: { display: true, text: 'Densidade de Testes (CTs por História)', font: { size: 18 } },
                     datalabels: {
-                        display: true,
+                        anchor: 'end',
                         align: 'top',
-                        color: (context) => context.dataset.data[context.dataIndex] >= 0 ? '#00A79D' : '#e74c3c',
+                        color: '#555',
                         font: { weight: 'bold', size: 12 },
-                        offset: 4,
-                        formatter: (value) => Math.round(value) + '%'
+                        formatter: (value, context) => context.datasetIndex === 0 && value > 0 ? value.toFixed(1) : ''
                     },
-                    legend: {
-                        position: 'bottom',
+                    legend: { 
+                        display: true,
+                        position: 'bottom'
                     }
                 }
             }
@@ -1091,6 +1006,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const months = getAvailableMonths();
         if (months.length < 2) {
             document.getElementById('trend-table-body').innerHTML = '<tr><td colspan="5">Não há dados suficientes para análise de tendências</td></tr>';
+            currentTrendMetrics = [];
             return;
         }
         
@@ -1098,8 +1014,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const previousMonthData = dadosRelatorio[months[months.length - 2]]?.[currentCenter];
         if (!currentMonthData || !previousMonthData) return;
         
-        const tableBody = document.getElementById('trend-table-body');
-        tableBody.innerHTML = '';
         
         // Métricas para análise
         const metrics = [
@@ -1176,22 +1090,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 target: 2.0
             },
             {
-                name: 'ROI de QA (Estimado)',
-                getCurrentValue: () => {
-                    const custo = currentMonthData.qaValor || 0;
-                    const val = (calcularGanhosSprint(currentMonthData.sprint1) + calcularGanhosSprint(currentMonthData.sprint2)) - (calcularPrejuizoSprint(currentMonthData.sprint1) + calcularPrejuizoSprint(currentMonthData.sprint2));
-                    return custo > 0 ? ((val - custo) / custo) * 100 : 0;
-                },
-                getPreviousValue: () => {
-                    const custo = previousMonthData.qaValor || 0;
-                    const val = (calcularGanhosSprint(previousMonthData.sprint1) + calcularGanhosSprint(previousMonthData.sprint2)) - (calcularPrejuizoSprint(previousMonthData.sprint1) + calcularPrejuizoSprint(previousMonthData.sprint2));
-                    return custo > 0 ? ((val - custo) / custo) * 100 : 0;
-                },
-                format: value => value.toFixed(1) + '%',
-                isPositiveIncrease: true,
-                target: 0
-            },
-            {
                 name: 'Retrabalho (Bugs Reexecutados)',
                 getCurrentValue: () => {
                     const s1 = currentMonthData.sprint1 || {};
@@ -1217,8 +1115,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         ];
         
-        // Preencher tabela com métricas
-        metrics.forEach(metric => {
+        // Calcular métricas e armazenar para ordenação
+        currentTrendMetrics = metrics.map(metric => {
             const currentValue = metric.getCurrentValue();
             const previousValue = metric.getPreviousValue();
             const difference = currentValue - previousValue;
@@ -1257,18 +1155,73 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
             
-            const row = document.createElement('tr');
-            // Adiciona uma classe à linha inteira para estilização opcional (ex: background sutil)
-            row.classList.add(statusClass.replace('badge-', 'status-'));
+            return {
+                name: metric.name,
+                prev: previousValue,
+                curr: currentValue,
+                prevFmt: metric.format(previousValue),
+                currFmt: metric.format(currentValue),
+                change: percentChange,
+                trendClass,
+                trendArrow,
+                statusClass,
+                statusText,
+                rowClass: statusClass.replace('badge-', 'status-')
+            };
+        });
 
+        renderTrendTable();
+    }
+
+    function renderTrendTable() {
+        const tableBody = document.getElementById('trend-table-body');
+        tableBody.innerHTML = '';
+
+        let data = [...currentTrendMetrics];
+
+        if (currentSort.column) {
+            data.sort((a, b) => {
+                let valA, valB;
+                switch (currentSort.column) {
+                    case 'name': valA = a.name; valB = b.name; break;
+                    case 'prev': valA = a.prev; valB = b.prev; break;
+                    case 'curr': valA = a.curr; valB = b.curr; break;
+                    case 'change': valA = a.change; valB = b.change; break;
+                    case 'status': valA = a.statusText; valB = b.statusText; break;
+                }
+                
+                if (valA < valB) return currentSort.direction === 'asc' ? -1 : 1;
+                if (valA > valB) return currentSort.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+
+        data.forEach(item => {
+            const row = document.createElement('tr');
+            row.className = item.rowClass;
             row.innerHTML = `
-                <td>${metric.name}</td>
-                <td>${metric.format(previousValue)}</td>
-                <td>${metric.format(currentValue)}</td>
-                <td class="${trendClass}">${percentChange >= 0 ? '+' : ''}${percentChange.toFixed(1)}% ${trendArrow}</td>
-                <td><span class="metric-badge ${statusClass}">${statusText}</span></td>
+                <td>${item.name}</td>
+                <td>${item.prevFmt}</td>
+                <td>${item.currFmt}</td>
+                <td class="${item.trendClass}">${item.change >= 0 ? '+' : ''}${item.change.toFixed(1)}% ${item.trendArrow}</td>
+                <td><span class="metric-badge ${item.statusClass}">${item.statusText}</span></td>
             `;
             tableBody.appendChild(row);
+        });
+        
+        // Atualizar ícones de ordenação
+        document.querySelectorAll('.trend-table th[data-sort]').forEach(th => {
+            const existingIcon = th.querySelector('.sort-icon');
+            if (existingIcon) existingIcon.remove();
+            
+            if (th.dataset.sort === currentSort.column) {
+                const icon = document.createElement('span');
+                icon.className = 'sort-icon';
+                icon.textContent = currentSort.direction === 'asc' ? ' ▲' : ' ▼';
+                icon.style.fontSize = '0.8em';
+                icon.style.marginLeft = '5px';
+                th.appendChild(icon);
+            }
         });
     }
     
@@ -1343,11 +1296,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 // para evitar quebras de layout e permitir ajuste de escala para caber em uma página.
 
                 const trendSection = document.getElementById('trend-analysis-section');
-                const originalTrendDisplay = trendSection.style.display;
-                trendSection.style.display = 'none'; // Oculta temporariamente para capturar apenas o topo
+                const chartsSection = document.querySelector('.charts-section');
 
-                // 1. Captura Principal (Gráficos e Resumo)
-                const mainCanvas = await html2canvas(element, {
+                const originalTrendDisplay = trendSection.style.display;
+                const originalChartsDisplay = chartsSection.style.display;
+
+                // Oculta seções para capturar apenas o topo (Header, Health, Cards)
+                trendSection.style.display = 'none';
+                chartsSection.style.display = 'none';
+
+                // 1. Captura do Topo
+                const topCanvas = await html2canvas(element, {
                     scale: 1.5, // Reduzido para otimizar memória
                     useCORS: true,
                     logging: false,
@@ -1359,9 +1318,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         const controls = doc.querySelector('.controls');
                         if (controls) controls.style.display = 'none';
                         
-                        // Garante que a tabela esteja oculta no clone
+                        // Garante ocultação no clone
                         const cloneTrend = doc.getElementById('trend-analysis-section');
                         if (cloneTrend) cloneTrend.style.display = 'none';
+                        const cloneCharts = doc.querySelector('.charts-section');
+                        if (cloneCharts) cloneCharts.style.display = 'none';
 
                         const clonedContainer = doc.getElementById('comparison-container');
                         if (clonedContainer) {
@@ -1369,6 +1330,8 @@ document.addEventListener('DOMContentLoaded', function() {
                             clonedContainer.style.border = 'none';
                             clonedContainer.style.backgroundColor = 'white'; // Garante fundo branco
                             clonedContainer.style.padding = '10px';
+                            clonedContainer.style.height = 'auto'; // Remove altura fixa se houver
+                            clonedContainer.style.minHeight = '0';
 
                             // Adiciona um título customizado para a página do PDF
                             const centerName = centerKey === 'Integracoes' ? 'Integrações' : centerKey;
@@ -1379,9 +1342,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 });
 
-                trendSection.style.display = originalTrendDisplay; // Restaura visibilidade
+                // Restaura visibilidade para capturar as outras partes
+                trendSection.style.display = originalTrendDisplay;
+                chartsSection.style.display = originalChartsDisplay;
 
-                // 2. Captura da Tabela de Tendências (Isolada)
+                // 2. Captura da Tabela de Tendências
                 const trendCanvas = await html2canvas(trendSection, {
                     scale: 1.5, // Reduzido para otimizar memória
                     useCORS: true,
@@ -1398,46 +1363,81 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 });
 
-                // 3. Montagem Inteligente no PDF
+                // 3. Captura dos Gráficos
+                const chartsCanvas = await html2canvas(chartsSection, {
+                    scale: 1.5,
+                    useCORS: true,
+                    logging: false,
+                    onclone: (doc) => {
+                        const cloneCharts = doc.querySelector('.charts-section');
+                        if (cloneCharts) {
+                            cloneCharts.style.margin = '0';
+                            cloneCharts.style.padding = '10px';
+                            cloneCharts.style.boxShadow = 'none';
+                            cloneCharts.style.border = 'none';
+                            cloneCharts.style.backgroundColor = 'white';
+                        }
+                    }
+                });
+
+                // 4. Montagem Inteligente no PDF
                 const margin = 10;
                 const pdfWidth = pdf.internal.pageSize.getWidth();
                 const pdfHeight = pdf.internal.pageSize.getHeight();
                 const contentWidth = pdfWidth - (margin * 2);
                 const contentHeight = pdfHeight - (margin * 2);
 
-                const mainImgHeight = (mainCanvas.height * contentWidth) / mainCanvas.width;
-                const trendImgHeight = (trendCanvas.height * contentWidth) / trendCanvas.width;
+                const topH = (topCanvas.height * contentWidth) / topCanvas.width;
+                const trendH = (trendCanvas.height * contentWidth) / trendCanvas.width;
+                const chartsH = (chartsCanvas.height * contentWidth) / chartsCanvas.width;
                 const spacing = 5;
 
+                const totalNeeded = topH + trendH + chartsH + (spacing * 2);
+
                 // Verifica se cabe tudo em uma página
-                if (mainImgHeight + trendImgHeight + spacing <= contentHeight) {
+                if (totalNeeded <= contentHeight) {
                     // Cabe perfeitamente
-                    pdf.addImage(mainCanvas, 'PNG', margin, margin, contentWidth, mainImgHeight);
-                    pdf.addImage(trendCanvas, 'PNG', margin, margin + mainImgHeight + spacing, contentWidth, trendImgHeight);
+                    pdf.addImage(topCanvas, 'PNG', margin, margin, contentWidth, topH);
+                    pdf.addImage(trendCanvas, 'PNG', margin, margin + topH + spacing, contentWidth, trendH);
+                    pdf.addImage(chartsCanvas, 'PNG', margin, margin + topH + trendH + (spacing * 2), contentWidth, chartsH);
                 } else {
                     // Não cabe. Tenta escalar para caber (se o estouro for pequeno, ex: até 25%)
-                    const totalNeeded = mainImgHeight + trendImgHeight + spacing;
                     if (totalNeeded <= contentHeight * 1.25) {
                         const scaleFactor = contentHeight / totalNeeded;
-                        const newMainH = mainImgHeight * scaleFactor;
-                        const newTrendH = trendImgHeight * scaleFactor;
+                        const newTopH = topH * scaleFactor;
+                        const newTrendH = trendH * scaleFactor;
+                        const newChartsH = chartsH * scaleFactor;
                         const newSpacing = spacing * scaleFactor;
                         
-                        pdf.addImage(mainCanvas, 'PNG', margin, margin, contentWidth, newMainH);
-                        pdf.addImage(trendCanvas, 'PNG', margin, margin + newMainH + newSpacing, contentWidth, newTrendH);
+                        pdf.addImage(topCanvas, 'PNG', margin, margin, contentWidth, newTopH);
+                        pdf.addImage(trendCanvas, 'PNG', margin, margin + newTopH + newSpacing, contentWidth, newTrendH);
+                        pdf.addImage(chartsCanvas, 'PNG', margin, margin + newTopH + newTrendH + (newSpacing * 2), contentWidth, newChartsH);
                     } else {
                         // Muito grande para escalar. Adiciona em páginas separadas.
-                        // Adiciona Main
-                        if (mainImgHeight <= contentHeight) {
-                            pdf.addImage(mainCanvas, 'PNG', margin, margin, contentWidth, mainImgHeight);
-                            // Tabela na próxima página
+                        let currentY = margin;
+                        
+                        // Adiciona Topo
+                        pdf.addImage(topCanvas, 'PNG', margin, currentY, contentWidth, topH);
+                        currentY += topH + spacing;
+
+                        // Adiciona Tabela (verifica espaço)
+                        if (currentY + trendH > contentHeight) {
                             pdf.addPage();
-                            pdf.addImage(trendCanvas, 'PNG', margin, margin, contentWidth, trendImgHeight);
+                            currentY = margin;
+                        }
+                        pdf.addImage(trendCanvas, 'PNG', margin, currentY, contentWidth, trendH);
+                        currentY += trendH + spacing;
+
+                        // Adiciona Gráficos (verifica espaço)
+                        if (currentY + chartsH > contentHeight) {
+                            pdf.addPage();
+                            currentY = margin;
+                        }
+                        // Se gráficos forem maiores que uma página inteira, escala para caber na página
+                        if (chartsH > contentHeight) {
+                            pdf.addImage(chartsCanvas, 'PNG', margin, margin, contentWidth, contentHeight);
                         } else {
-                            // Main já é maior que a página (improvável com CSS ajustado), escala o Main para caber
-                            pdf.addImage(mainCanvas, 'PNG', margin, margin, contentWidth, contentHeight);
-                            pdf.addPage();
-                            pdf.addImage(trendCanvas, 'PNG', margin, margin, contentWidth, trendImgHeight);
+                            pdf.addImage(chartsCanvas, 'PNG', margin, currentY, contentWidth, chartsH);
                         }
                     }
                 }

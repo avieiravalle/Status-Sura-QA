@@ -2,34 +2,6 @@
  * utils.js - Funções utilitárias compartilhadas para cálculos de métricas de QA.
  */
 
-// --- Constantes Financeiras e Metas ---
-const valorPorCTEscrito = 13;
-const valorPorCTExecutado = 40;
-const valorPorBugNaoProd = 100;
-const prejuizoPorBugProd = 200;
-
-/**
- * Calcula os ganhos monetários gerados por uma sprint com base nas atividades de QA.
- */
-function calcularGanhosSprint(sprint) {
-    if (!sprint) return 0;
-    const bugs = sprint.bugsNaoProdutivos || {};
-    const totalBugsNaoProd = (bugs.baixa || 0) + (bugs.media || 0) + (bugs.alta || 0);
-    
-    return ((sprint.ctEscritos || 0) * valorPorCTEscrito) +
-           ((sprint.ctExecutados || 0) * valorPorCTExecutado) +
-           (totalBugsNaoProd * valorPorBugNaoProd);
-}
-
-/**
- * Calcula o prejuízo monetário gerado por uma sprint.
- */
-function calcularPrejuizoSprint(sprint) {
-    if (!sprint) return 0;
-    // O prejuízo vem da reexecução de bugs que chegaram em produção.
-    return (sprint.reexecucaoBugsProd || 0) * prejuizoPorBugProd;
-}
-
 /**
  * Calcula a porcentagem de cobertura de testes com base no número de User Stories e Casos de Teste.
  * Meta: 3 casos de teste por User Story.

@@ -68,6 +68,8 @@
         .trend-table { width: 100%; border-collapse: collapse; }
         .trend-table th, .trend-table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid var(--border-color); }
         .trend-table thead th { background-color: #f2f5f8; font-weight: 600; color: var(--primary-color); }
+        .trend-table thead th[data-sort] { cursor: pointer; user-select: none; }
+        .trend-table thead th[data-sort]:hover { background-color: #e2e6ea; }
         .trend-table tbody tr:nth-child(even) { background-color: #fbfcfe; }
         .trend-table tbody tr:hover { background-color: #f0f4f8; }
 
@@ -226,6 +228,24 @@
             </div>
         </div>
 
+        <div class="trend-analysis-section" id="trend-analysis-section">
+            <h2 class="section-header">Análise de Tendências Detalhada</h2>
+            <table class="trend-table">
+                <thead>
+                    <tr>
+                        <th data-sort="name">Métrica</th>
+                        <th data-sort="prev">Mês Anterior</th>
+                        <th data-sort="curr">Mês Atual</th>
+                        <th data-sort="change">Variação</th>
+                        <th data-sort="status">Status vs Meta</th>
+                    </tr>
+                </thead>
+                <tbody id="trend-table-body">
+                    <!-- Rows will be populated by JS -->
+                </tbody>
+            </table>
+        </div>
+
         <div class="charts-section">
             <h2 class="section-header">Evolução das Métricas</h2>
             <div class="charts-grid">
@@ -245,33 +265,12 @@
                     <canvas id="leadtime-chart"></canvas>
                 </div>
                 <div class="chart-container">
-                    <canvas id="qa-value-chart"></canvas>
-                </div>
-                <div class="chart-container">
-                    <canvas id="qa-roi-chart"></canvas>
-                </div>
-                <div class="chart-container">
                     <canvas id="automated-tests-chart"></canvas>
                 </div>
+                <div class="chart-container">
+                    <canvas id="test-cases-per-us-chart"></canvas>
+                </div>
             </div>
-        </div>
-
-        <div class="trend-analysis-section" id="trend-analysis-section">
-            <h2 class="section-header">Análise de Tendências Detalhada</h2>
-            <table class="trend-table">
-                <thead>
-                    <tr>
-                        <th>Métrica</th>
-                        <th>Mês Anterior</th>
-                        <th>Mês Atual</th>
-                        <th>Variação</th>
-                        <th>Status vs Meta</th>
-                    </tr>
-                </thead>
-                <tbody id="trend-table-body">
-                    <!-- Rows will be populated by JS -->
-                </tbody>
-            </table>
         </div>
     </div>
 
@@ -284,13 +283,6 @@
             <p><strong>Fórmula:</strong> <code>(Total de CTs / (Total de US * 3)) * 100%</code></p>
             <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
 
-            <h4 style="color: #0033A0; margin-top: 20px; margin-bottom: 5px;">ROI (Retorno sobre Investimento) de QA</h4>
-            <p>Compara o valor monetário gerado pelas atividades de QA com o custo mensal do profissional, considerando também os prejuízos de bugs que chegaram em produção.</p>
-            <p><strong>Ganhos (Valor Gerado):</strong> <code>(Nº CTs Escritos * R$50) + (Nº CTs Executados * R$10) + (Nº Bugs Não Produtivos * R$100)</code></p>
-            <p><strong>Prejuízo:</strong> <code>(Nº Reexecução de Bugs Produtivos * R$500)</code></p>
-            <p><strong>Valor Líquido:</strong> <code>Ganhos - Prejuízo</code></p>
-            <p><strong>Fórmula ROI:</strong> <code>((Valor Líquido - Custo QA) / Custo QA) * 100%</code></p>
-            <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
 
             <h4 style="color: #0033A0; margin-top: 20px; margin-bottom: 5px;">Economia de Tempo (Automação)</h4>
             <p>Mede o tempo economizado (em minutos) ao executar testes de forma automatizada em vez de manual.</p>

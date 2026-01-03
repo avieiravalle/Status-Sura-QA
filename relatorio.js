@@ -121,7 +121,6 @@ function updateReport() {
     updateSprintData(previousCenterData);
     updateBugsProdutivos(previousCenterData);
     updateSummary();
-    updateQaRoiSummary(); // Popula a nova tabela de ROI
     loadActionPlan();
 
     // Garante que o plano de ação está habilitado se houver dados
@@ -277,11 +276,60 @@ function generateSprintHTML(sprintData, cumulativeScenarios = null) {
     fragment.appendChild(createTable('Cobertura de Testes (Funcional)', [
         createMetricRow('User Stories (US)', sprintData.usSprint, '', null),
         createMetricRow('Casos de Teste Criados', sprintData.casosTestePorUs, '', null),
-        createMetricRow('Cobertura Atingida', coberturaTestesCalc, '%', METRIC_TARGETS.coberturaTestesPercentual)
+        createMetricRow('Cobertura Atingida', coberturaTestesCalc, '%', METRIC_TARGETS.coberturaTestesPercentual),
+        createMetricRow('Pass Rate', sprintData.passRate, '%', METRIC_TARGETS.passRate)
     ]));
 
+    // Se houver detalhamento de User Stories, adiciona uma tabela extra
+    if (sprintData.listaUserStories && sprintData.listaUserStories.length > 0) {
+        // Cabeçalho da tabela de detalhamento
+        const headerRow = document.createElement('tr');
+        headerRow.innerHTML = `
+            <th style="background-color: #f9f9f9; font-size: 0.9em;">História</th>
+            <th style="background-color: #f9f9f9; font-size: 0.9em;">Total CTs</th>
+            <th style="background-color: #f9f9f9; font-size: 0.9em;">Executados</th>
+            <th style="background-color: #f9f9f9; font-size: 0.9em;">Passados</th>
+        `;
+
+        const usRows = sprintData.listaUserStories.map(us => {
+            const row = document.createElement('tr');
+            row.className = 'data-row';
+            const cts = us.cts || 0;
+            const ctsClass = cts < 4 ? 'negative' : '';
+            const executed = us.executed || 0;
+            const passed = us.passed || 0;
+            const passedClass = passed < executed ? 'negative' : '';
+
+            row.innerHTML = `
+                <td style="padding-left: 20px; color: #555;">• ${us.nome || 'Sem nome'}</td>
+                <td class="${ctsClass}">${cts}</td>
+                <td>${executed}</td>
+                <td class="${passedClass}">${passed}</td>
+            `;
+            return row;
+        });
+
+        // Cria uma tabela "filha" ou seção de detalhamento
+        const detailTable = createTable('Detalhamento por História', usRows);
+        
+        // Substitui o cabeçalho padrão da tabela criada por createTable para ajustar as colunas
+        const thead = detailTable.querySelector('thead');
+        if(thead) {
+            // Remove a linha de "Meta" padrão e insere o novo cabeçalho
+            thead.innerHTML = ''; 
+            const titleRow = document.createElement('tr');
+            const titleCell = document.createElement('th');
+            titleCell.colSpan = 4;
+            titleCell.textContent = 'Detalhamento por História';
+            titleRow.appendChild(titleCell);
+            thead.appendChild(titleRow);
+            thead.appendChild(headerRow);
+        }
+
+        fragment.appendChild(detailTable);
+    }
+
     fragment.appendChild(createTable('Métricas de Qualidade', [
-        createMetricRow('Pass Rate', sprintData.passRate, '%', METRIC_TARGETS.passRate),
         createMetricRow('Lead Time de Testes', sprintData.leadTimeTestes, ' dias', METRIC_TARGETS.leadTimeTestes),
         createMetricRow('Lead Time de Bugs', sprintData.leadTimeBugs, ' dias', METRIC_TARGETS.leadTimeBugs),
         createMetricRow('Lead Time de Bugs produção', sprintData.leadTimeBugsProd || 0, ' dias', METRIC_TARGETS.leadTimeBugsProd)
@@ -299,9 +347,9 @@ function generateSprintHTML(sprintData, cumulativeScenarios = null) {
     const cenariosDisplay = cumulativeScenarios !== null ? cumulativeScenarios : autoData.cenarios;
 
     fragment.appendChild(createTable('Automação de Testes', [
-        createMetricRow('Cenários Automatizados', cenariosDisplay, '', { value: 0, higherIsBetter: true, displayTarget: false }),
-        createMetricRow('Tempo Exec. Manual', autoData.tempoManual, ' min', { value: 9999, higherIsBetter: false, displayTarget: false }),
-        createMetricRow('Tempo Exec. Automatizado', autoData.tempoAutom, ' min', { value: 9999, higherIsBetter: false, displayTarget: false }),
+        createMetricRow('Cenários Automatizados', cenariosDisplay, '', { value: 50, higherIsBetter: true, displayTarget: true }),
+        createMetricRow('Tempo Exec. Manual', autoData.tempoManual, ' min', { value: 0, higherIsBetter: false, displayTarget: true }),
+        createMetricRow('Tempo Exec. Automatizado', autoData.tempoAutom, ' min', { value: 60, higherIsBetter: false, displayTarget: true }),
         createMetricRow('Economia de Tempo', economia, ' min', { value: 0, higherIsBetter: true, displayTarget: false })
     ]));
 
@@ -369,22 +417,6 @@ function updateSummary() {
             return calculateTestCoverage(totalUS, totalCasosTeste);
         }, getStatus: (v) => v >= METRIC_TARGETS.coberturaTestesPercentual.value ? 'positive' : v >= (METRIC_TARGETS.coberturaTestesPercentual.value - 10) ? 'neutral' : 'negative' },
         { 
-            name: 'ROI QA', unit: '%', 
-            getValue: (s1, s2, centerData) => {
-                const custoQaMes = centerData.qaValor || 0; // Usa o valor mensal
-                
-                const ganhosMes = calcularGanhosSprint(s1) + calcularGanhosSprint(s2);
-                const prejuizoMes = calcularPrejuizoSprint(s1) + calcularPrejuizoSprint(s2);
-                const valorLiquidoMes = ganhosMes - prejuizoMes;
-
-                if (custoQaMes > 0) {
-                    return ((valorLiquidoMes - custoQaMes) / custoQaMes) * 100;
-                }
-                return valorLiquidoMes > 0 ? Infinity : 0;
-            }, 
-            getStatus: (v) => v >= 50 ? 'positive' : v >= 0 ? 'neutral' : 'negative' 
-        },
-        { 
             name: 'Bugs (Não Prod.)', unit: '', 
             getValue: (s1, s2) => getSprintTotalNonProdBugs(s1) + getSprintTotalNonProdBugs(s2), 
             getStatus: (v) => {
@@ -449,73 +481,6 @@ function updateSummary() {
     });
     summaryGrid.appendChild(fragment);
 }
-
-/**
- * Atualiza a tabela de resumo com o Custo, Valor e ROI de QA para o center selecionado.
- */
-function updateQaRoiSummary() {
-    const tableBody = document.querySelector('#resumo-qa-roi-table tbody');
-    tableBody.innerHTML = ''; // Limpa a tabela
-
-    const centerKey = appState.currentCenter;
-    const centerData = dadosRelatorio[appState.currentMonth]?.[centerKey];
-
-    if (!centerData || !centerData.sprint1 || !centerData.sprint2) {
-        tableBody.innerHTML = '<tr><td colspan="4" style="text-align:center;">Dados de ROI não disponíveis para este center.</td></tr>';
-        return;
-    }
-
-    const { sprint1, sprint2 } = centerData;
-
-    // 1. Calcular Custo QA (usando o valor mensal)
-    const custoQaMes = centerData.qaValor || 0;
-
-    // 2. Calcular Ganhos, Prejuízos e Valor Líquido
-    const ganhosMes = calcularGanhosSprint(sprint1) + calcularGanhosSprint(sprint2);
-    const prejuizoMes = calcularPrejuizoSprint(sprint1) + calcularPrejuizoSprint(sprint2);
-    const valorAtividadesMes = ganhosMes - prejuizoMes;
-
-    // 3. Calcular ROI
-    let roi = 0;
-    if (custoQaMes > 0) {
-        roi = ((valorAtividadesMes - custoQaMes) / custoQaMes) * 100;
-    } else if (valorAtividadesMes > 0) {
-        roi = Infinity;
-    }
-
-    // Formata valores para exibição e tooltips
-    const custoFmt = custoQaMes.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-    const ganhosFmt = ganhosMes.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-    const prejuizoFmt = prejuizoMes.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-    const valorAtividadesFmt = valorAtividadesMes.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
-    // Cria tooltips (legendas) explicativas para os resultados
-    const valorAtividadesTitle = `Valor líquido das atividades de QA (Ganhos - Prejuízos). Calculado como: ${ganhosFmt} - ${prejuizoFmt}.`;
-    let roiTitle = `Fórmula: ((${valorAtividadesFmt} - ${custoFmt}) / ${custoFmt}) * 100%.`;
-    if (!isFinite(roi)) {
-        roiTitle = 'O ROI é infinito porque o custo de QA é zero, mas houve valor líquido positivo.';
-    } else if (roi < 0) {
-        roiTitle += ' O retorno é negativo porque o custo de QA foi maior que o valor líquido gerado.';
-    } else if (roi > 0) {
-        roiTitle += ' O retorno é positivo porque o valor líquido gerado superou o custo de QA.';
-    } else {
-        roiTitle += ' O valor líquido gerado foi igual ao custo de QA (ponto de equilíbrio).';
-    }
-
-    // 4. Criar e adicionar a linha na tabela
-    const row = tableBody.insertRow();
-    const roiDisplay = isFinite(roi) ? `${roi.toFixed(2)}%` : '∞';
-    const roiColor = roi >= 0 ? 'positive' : 'negative';
-
-    row.innerHTML = `
-        <td>${centerKey === 'Integracoes' ? 'Integrações' : centerKey}</td>
-        <td title="Custo mensal do profissional de QA">${custoFmt}</td>
-        <td style="font-weight: bold;" title="${valorAtividadesTitle}">${valorAtividadesFmt}</td>
-        <td class="${roiColor}" style="font-weight: bold;" title="${roiTitle}">${roiDisplay}</td>
-    `;
-}
-
-// --- Funções para Plano de Ação (localStorage) ---
 
 function getActionPlanKey() {
     return `actionPlan-${appState.currentMonth}-${appState.currentCenter}`;

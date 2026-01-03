@@ -14,6 +14,12 @@
             --border-color: #ddd;
             --header-color: #0033A0; /* Sura Blue */
         }
+        
+        /* Estilos para Tabela de User Stories */
+        .us-table { width: 100%; margin-bottom: 10px; border-collapse: collapse; font-size: 0.9em; }
+        .us-table th, .us-table td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+        .us-table th { background-color: #f8f9fa; color: var(--primary-color); }
+        .btn-icon { cursor: pointer; border: none; background: none; font-size: 1.1em; }
 
         * {
             box-sizing: border-box;
@@ -328,14 +334,6 @@
 
             function ensureDataStructure(productData) {
                 // 1. Migração de Bugs de Produção (Sprint -> Mensal)
-                // Migração do Custo de QA (Sprint -> Mensal)
-                if (productData.sprint1?.qaValor || productData.sprint2?.qaValor) {
-                    // Soma os valores antigos e move para o novo campo mensal
-                    productData.qaValor = (productData.sprint1.qaValor || 0) + (productData.sprint2.qaValor || 0);
-                    delete productData.sprint1.qaValor;
-                    delete productData.sprint2.qaValor;
-                }
-                if (typeof productData.qaValor === 'undefined') productData.qaValor = 0;
                 if (!productData.bugsProducao) {
                     productData.bugsProducao = { baixa: 0, media: 0, alta: 0 };
                     // Tenta migrar de sprints antigas se existirem
@@ -363,9 +361,6 @@
                     if (!productData[sprintKey].testesAutomatizados) {
                         productData[sprintKey].testesAutomatizados = { cenarios: 0, tempoManual: 0, tempoAutom: 0 };
                     }
-                    // Garante que os campos de atividades de QA existem
-                    if (typeof productData[sprintKey].ctEscritos === 'undefined') productData[sprintKey].ctEscritos = 0;
-                    if (typeof productData[sprintKey].ctExecutados === 'undefined') productData[sprintKey].ctExecutados = 0;
                     if (typeof productData[sprintKey].leadTimeBugsProd === 'undefined') productData[sprintKey].leadTimeBugsProd = 0;
                     
                     // Migração do campo legado 'reexecucaoBugs' para 'reexecucaoBugsNaoProd'
@@ -375,6 +370,9 @@
                     }
                     if (typeof productData[sprintKey].reexecucaoBugsNaoProd === 'undefined') productData[sprintKey].reexecucaoBugsNaoProd = 0;
                     if (typeof productData[sprintKey].reexecucaoBugsProd === 'undefined') productData[sprintKey].reexecucaoBugsProd = 0;
+
+                    // Inicialização da lista de User Stories (Nova Funcionalidade)
+                    if (!productData[sprintKey].listaUserStories) productData[sprintKey].listaUserStories = [];
 
                     // Limpeza de legado caso ainda exista
                     if (productData[sprintKey].bugsProducao) delete productData[sprintKey].bugsProducao;
@@ -464,10 +462,6 @@
                     <div class="sprint-form" id="monthly-data-form" style="grid-column: span 2;">
                         <h3>Dados Consolidados do Mês</h3>
                         <div class="input-group">
-                            <label></label>
-                            ${generateInput('productData', 'qaValor', data.qaValor || 0, 'Custo Total QA (R$)')}
-                        </div>
-                        <div class="input-group">
                             <label>Bugs em Produção</label>
                             <div class="sub-group" style="grid-template-columns: repeat(3, 1fr);">
                                 ${generateInput('productData', 'bugsProducao.baixa', data.bugsProducao.baixa, 'Baixa')}
@@ -507,8 +501,9 @@
                                 ${generateInput(sprintKey, 'bugsNaoProdutivos.alta', data.bugsNaoProdutivos.alta, 'Alta')}
                             </div>
                         </div>
-                        ${generateInput(sprintKey, 'usSprint', data.usSprint, 'User Stories da Sprint')}
-                        ${generateInput(sprintKey, 'casosTestePorUs', data.casosTestePorUs, 'Total de Casos de Teste')}
+                        
+                        ${generateUserStoriesSection(sprintKey, data)}
+                        
                         ${generateInput(sprintKey, 'leadTimeTestes', data.leadTimeTestes, 'Lead Time de Testes (dias)')}
                         <!-- O campo coberturaTestesPercentual foi removido pois agora é calculado dinamicamente -->
                         ${generateInput(sprintKey, 'leadTimeBugs', data.leadTimeBugs, 'Lead Time de Bugs (dias)')}
@@ -522,13 +517,52 @@
                             </div>
                         </div>
                         <div class="input-group">
-                            <label>Análise de Valor QA</label>
-                            <div class="sub-group" style="grid-template-columns: repeat(4, 1fr);">
-                                ${generateInput(sprintKey, 'ctEscritos', data.ctEscritos || 0, 'CTs Escritos')}
-                                ${generateInput(sprintKey, 'ctExecutados', data.ctExecutados || 0, 'CTs Executados')}
+                            <label>Métricas de Retrabalho</label>
+                            <div class="sub-group" style="grid-template-columns: repeat(2, 1fr);">
                                 ${generateInput(sprintKey, 'reexecucaoBugsNaoProd', data.reexecucaoBugsNaoProd || 0, 'Reexec. Não-Prod')}
-                                ${generateInput(sprintKey, 'reexecucaoBugsProd', data.reexecucaoBugsProd || 0, 'Reexec. Prod (Prejuízo)')}
+                                ${generateInput(sprintKey, 'reexecucaoBugsProd', data.reexecucaoBugsProd || 0, 'Reexec. Prod')}
                             </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            function generateUserStoriesSection(sprintKey, data) {
+                const stories = data.listaUserStories || [];
+                let rowsHtml = '';
+                
+                stories.forEach((story, index) => {
+                    rowsHtml += `
+                        <tr class="us-row">
+                            <td><input type="text" class="us-name" value="${story.nome || ''}" placeholder="Ex: US-123 Login"></td>
+                            <td><input type="number" class="us-cts" value="${story.cts || 0}" min="0" placeholder="Total" oninput="window.updateUsTotals('${sprintKey}')"></td>
+                            <td><input type="number" class="us-exec" value="${story.executed || 0}" min="0" placeholder="Exec." oninput="window.updateUsTotals('${sprintKey}')"></td>
+                            <td><input type="number" class="us-pass" value="${story.passed || 0}" min="0" placeholder="Pass." oninput="window.updateUsTotals('${sprintKey}')"></td>
+                            <td style="text-align: center;"><button type="button" class="btn-icon" style="color: #e74c3c;" onclick="window.removeUsRow(this, '${sprintKey}')" title="Remover">🗑️</button></td>
+                        </tr>
+                    `;
+                });
+
+                return `
+                    <div class="input-group" style="background: #f9f9f9; padding: 10px; border-radius: 4px; border: 1px solid #eee;">
+                        <label>Detalhamento de Cobertura (User Stories)</label>
+                        <table class="us-table" id="table-${sprintKey}">
+                            <thead>
+                                <tr>
+                                    <th>História (ID/Nome)</th>
+                                    <th style="width: 80px;">Total</th>
+                                    <th style="width: 80px;">Exec.</th>
+                                    <th style="width: 80px;">Pass.</th>
+                                    <th style="width: 50px;">Ação</th>
+                                </tr>
+                            </thead>
+                            <tbody class="us-list-body">${rowsHtml}</tbody>
+                        </table>
+                        <button type="button" onclick="window.addUsRow('${sprintKey}')" style="padding: 5px 10px; font-size: 12px; background-color: #00A79D;">+ Adicionar História</button>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px;">
+                            ${generateInput(sprintKey, 'usSprint', data.usSprint, 'Total US (Calculado)')}
+                            ${generateInput(sprintKey, 'casosTestePorUs', data.casosTestePorUs, 'Total CTs (Calculado)')}
                         </div>
                     </div>
                 `;
@@ -575,6 +609,19 @@
                         const sprintNum = sprintKey.replace('sprint', '');
                         productData[sprintKey].nome = `Sprint ${sprintNum}`;
                     }
+
+                    // Salvar Lista de User Stories
+                    const usRows = document.querySelectorAll(`#${sprintKey}-form .us-row`);
+                    const listaUserStories = [];
+                    usRows.forEach(row => {
+                        listaUserStories.push({
+                            nome: row.querySelector('.us-name').value,
+                            cts: parseInt(row.querySelector('.us-cts').value) || 0,
+                            executed: parseInt(row.querySelector('.us-exec').value) || 0,
+                            passed: parseInt(row.querySelector('.us-pass').value) || 0
+                        });
+                    });
+                    productData[sprintKey].listaUserStories = listaUserStories;
                 });
 
                 // Salvar Dados Mensais (Custo QA e Bugs Prod)
@@ -713,8 +760,7 @@
                     leadTimeBugs: 0,
                     leadTimeBugsProd: 0,
                     testesAutomatizados: { cenarios: 0, tempoManual: 0, tempoAutom: 0 },
-                    ctEscritos: 0,
-                    ctExecutados: 0,
+                    listaUserStories: [],
                     reexecucaoBugsNaoProd: 0,
                     reexecucaoBugsProd: 0
                 };
@@ -781,6 +827,53 @@
             const modal = document.getElementById('custom-modal');
             modal.style.display = 'none';
         }
+
+        // --- Funções Globais para Manipulação da Lista de US ---
+        window.addUsRow = function(sprintKey) {
+            const tbody = document.querySelector(`#table-${sprintKey} .us-list-body`);
+            const tr = document.createElement('tr');
+            tr.className = 'us-row';
+            tr.innerHTML = `
+                <td><input type="text" class="us-name" placeholder="Ex: US-123 Nova Funcionalidade"></td>
+                <td><input type="number" class="us-cts" value="0" min="0" placeholder="Total" oninput="window.updateUsTotals('${sprintKey}')"></td>
+                <td><input type="number" class="us-exec" value="0" min="0" placeholder="Exec." oninput="window.updateUsTotals('${sprintKey}')"></td>
+                <td><input type="number" class="us-pass" value="0" min="0" placeholder="Pass." oninput="window.updateUsTotals('${sprintKey}')"></td>
+                <td style="text-align: center;"><button type="button" class="btn-icon" style="color: #e74c3c;" onclick="window.removeUsRow(this, '${sprintKey}')" title="Remover">🗑️</button></td>
+            `;
+            tbody.appendChild(tr);
+            window.updateUsTotals(sprintKey);
+        };
+
+        window.removeUsRow = function(btn, sprintKey) {
+            btn.closest('tr').remove();
+            window.updateUsTotals(sprintKey);
+        };
+
+        window.updateUsTotals = function(sprintKey) {
+            const rows = document.querySelectorAll(`#table-${sprintKey} .us-row`);
+            let totalUS = 0;
+            let totalCTs = 0;
+            let totalExec = 0;
+            let totalPass = 0;
+            
+            rows.forEach(row => {
+                totalUS++;
+                totalCTs += parseInt(row.querySelector('.us-cts').value) || 0;
+                totalExec += parseInt(row.querySelector('.us-exec').value) || 0;
+                totalPass += parseInt(row.querySelector('.us-pass').value) || 0;
+            });
+
+            if (document.getElementById(`${sprintKey}-usSprint`)) document.getElementById(`${sprintKey}-usSprint`).value = totalUS;
+            if (document.getElementById(`${sprintKey}-casosTestePorUs`)) document.getElementById(`${sprintKey}-casosTestePorUs`).value = totalCTs;
+
+            // Cálculo automático do Pass Rate
+            if (totalExec > 0) {
+                const passRate = (totalPass / totalExec) * 100;
+                // Atualiza o campo Pass Rate da sprint (limitado a 2 casas decimais)
+                const passRateInput = document.getElementById(`${sprintKey}-passRate`);
+                if (passRateInput) passRateInput.value = parseFloat(passRate.toFixed(2));
+            }
+        };
     </script>
 </body>
 </html>

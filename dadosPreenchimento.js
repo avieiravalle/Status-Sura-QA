@@ -362,7 +362,7 @@ const dadosRelatorio = {
           "metodos": 32,
           "branches": 15
         },
-        "passRate": 95,
+        "passRate": 60,
         "bugsNaoProdutivos": {
           "baixa": 2,
           "media": 0,
@@ -371,8 +371,8 @@ const dadosRelatorio = {
         "coberturaTestesPercentual": 95,
         "leadTimeTestes": 4,
         "leadTimeBugs": 1,
-        "usSprint": 6,
-        "casosTestePorUs": 46,
+        "usSprint": 3,
+        "casosTestePorUs": 12,
         "testesAutomatizados": {
           "cenarios": 0,
           "tempoManual": 360,
@@ -382,7 +382,27 @@ const dadosRelatorio = {
         "ctExecutados": 44,
         "reexecucaoBugsNaoProd": 2,
         "reexecucaoBugsProd": 1,
-        "leadTimeBugsProd": 0
+        "leadTimeBugsProd": 0,
+        "listaUserStories": [
+          {
+            "nome": "0001",
+            "cts": 2,
+            "executed": 2,
+            "passed": 1
+          },
+          {
+            "nome": "0002",
+            "cts": 5,
+            "executed": 3,
+            "passed": 1
+          },
+          {
+            "nome": "0003",
+            "cts": 5,
+            "executed": 5,
+            "passed": 4
+          }
+        ]
       },
       "sprint2": {
         "numero": "02",
@@ -413,7 +433,8 @@ const dadosRelatorio = {
         "ctExecutados": 0,
         "reexecucaoBugsNaoProd": 0,
         "reexecucaoBugsProd": 0,
-        "leadTimeBugsProd": 0
+        "leadTimeBugsProd": 0,
+        "listaUserStories": []
       },
       "bugsProducao": {
         "baixa": 0,

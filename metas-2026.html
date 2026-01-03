@@ -123,5 +123,30 @@
     <div id="toast-container"></div>
 
     <script src="metas-2026.js"></script>
+
+    <script>
+        /**
+         * Adiciona um indicador visual (check verde) para atividades concluídas.
+         * Usa um MutationObserver para aplicar a mudança dinamicamente após a tabela ser renderizada pelo script principal.
+         */
+        document.addEventListener('DOMContentLoaded', () => {
+            const activitiesBody = document.getElementById('activities-body');
+
+            const addCheckmarks = () => {
+                activitiesBody.querySelectorAll('tr').forEach(row => {
+                    const statusCell = row.cells[3]; // A 4ª coluna é a de Status
+                    if (statusCell && statusCell.textContent.trim() === 'Concluído' && !statusCell.querySelector('.status-check')) {
+                        statusCell.innerHTML += ' <span class="status-check" style="color: var(--positive-color, #2ecc71); font-weight: bold;">✔</span>';
+                    }
+                });
+            };
+
+            const observer = new MutationObserver(addCheckmarks);
+            observer.observe(activitiesBody, { childList: true, subtree: true });
+
+            // Executa uma vez no início, caso a tabela já esteja populada
+            addCheckmarks();
+        });
+    </script>
 </body>
 </html>

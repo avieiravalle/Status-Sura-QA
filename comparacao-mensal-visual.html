@@ -196,6 +196,14 @@
                 </select>
             </div>
             <div class="control-group">
+                <label for="period-select">Período:</label>
+                <select id="period-select">
+                    <option value="6">Últimos 6 meses</option>
+                    <option value="12" selected>Últimos 12 meses</option>
+                    <option value="all">Todo o histórico</option>
+                </select>
+            </div>
+            <div class="control-group">
                 <button id="save-pdf-btn">Salvar como PDF</button>
                 <button id="return-btn">Voltar ao Relatório</button>
             </div>
@@ -269,6 +277,9 @@
                 </div>
                 <div class="chart-container">
                     <canvas id="test-cases-per-us-chart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <canvas id="qa-efficiency-chart"></canvas>
                 </div>
             </div>
         </div>

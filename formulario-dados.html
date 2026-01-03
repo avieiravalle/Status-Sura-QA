@@ -373,6 +373,9 @@
 
                     // Inicialização da lista de User Stories (Nova Funcionalidade)
                     if (!productData[sprintKey].listaUserStories) productData[sprintKey].listaUserStories = [];
+                    
+                    // Inicialização da Eficiência QA
+                    if (!productData[sprintKey].eficiencia) productData[sprintKey].eficiencia = { escrita: 0, execucao: 0, reexecucao: 0 };
 
                     // Limpeza de legado caso ainda exista
                     if (productData[sprintKey].bugsProducao) delete productData[sprintKey].bugsProducao;
@@ -521,6 +524,14 @@
                             <div class="sub-group" style="grid-template-columns: repeat(2, 1fr);">
                                 ${generateInput(sprintKey, 'reexecucaoBugsNaoProd', data.reexecucaoBugsNaoProd || 0, 'Reexec. Não-Prod')}
                                 ${generateInput(sprintKey, 'reexecucaoBugsProd', data.reexecucaoBugsProd || 0, 'Reexec. Prod')}
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label>Eficiência do QA (Tempos Médios)</label>
+                            <div class="sub-group" style="grid-template-columns: repeat(3, 1fr);">
+                                ${generateInput(sprintKey, 'eficiencia.escrita', data.eficiencia ? data.eficiencia.escrita : 0, 'Escrita (min)')}
+                                ${generateInput(sprintKey, 'eficiencia.execucao', data.eficiencia ? data.eficiencia.execucao : 0, 'Execução (min)')}
+                                ${generateInput(sprintKey, 'eficiencia.reexecucao', data.eficiencia ? data.eficiencia.reexecucao : 0, 'Reexecução (min)')}
                             </div>
                         </div>
                     </div>
@@ -762,7 +773,8 @@
                     testesAutomatizados: { cenarios: 0, tempoManual: 0, tempoAutom: 0 },
                     listaUserStories: [],
                     reexecucaoBugsNaoProd: 0,
-                    reexecucaoBugsProd: 0
+                    reexecucaoBugsProd: 0,
+                    eficiencia: { escrita: 0, execucao: 0, reexecucao: 0 }
                 };
             }
 

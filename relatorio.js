@@ -27,6 +27,11 @@ const METRIC_TARGETS = {
         baixa: { value: 5, higherIsBetter: false },
         media: { value: 2, higherIsBetter: false },
         alta: { value: 0, higherIsBetter: false }
+    },
+    eficienciaQa: {
+        escrita: { value: 7, higherIsBetter: false },
+        execucao: { value: 7, higherIsBetter: false },
+        reexecucao: { value: 5, higherIsBetter: false }
     }
 };
 
@@ -351,6 +356,14 @@ function generateSprintHTML(sprintData, cumulativeScenarios = null) {
         createMetricRow('Tempo Exec. Manual', autoData.tempoManual, ' min', { value: 0, higherIsBetter: false, displayTarget: true }),
         createMetricRow('Tempo Exec. Automatizado', autoData.tempoAutom, ' min', { value: 60, higherIsBetter: false, displayTarget: true }),
         createMetricRow('Economia de Tempo', economia, ' min', { value: 0, higherIsBetter: true, displayTarget: false })
+    ]));
+
+    // Seção de Eficiência do QA
+    const eficienciaData = sprintData.eficiencia || { escrita: 0, execucao: 0, reexecucao: 0 };
+    fragment.appendChild(createTable('Eficiência do QA (Médias)', [
+        createMetricRow('Escrita de CTs', eficienciaData.escrita, ' min', METRIC_TARGETS.eficienciaQa.escrita),
+        createMetricRow('Execução de CTs', eficienciaData.execucao, ' min', METRIC_TARGETS.eficienciaQa.execucao),
+        createMetricRow('Reexecução de Bugs', eficienciaData.reexecucao, ' min', METRIC_TARGETS.eficienciaQa.reexecucao)
     ]));
 
     return fragment;

@@ -102,13 +102,17 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Variáveis globais
     let currentCenter;
-    let codeCoverageChart, bugsChart, leadTimeChart, overallHealthChart, reworkChart, automatedTestsChart, bugsSeverityChart, testCasesPerUsChart;
+    let codeCoverageChart, bugsChart, leadTimeChart, overallHealthChart, reworkChart, automatedTestsChart, bugsSeverityChart, testCasesPerUsChart, qaEfficiencyChart;
     let currentSort = { column: null, direction: 'asc' };
     let currentTrendMetrics = [];
     
     // Configurar listeners para controles
     document.getElementById('product-select').addEventListener('change', function() {
         currentCenter = this.value;
+        updateAllData();
+    });
+    
+    document.getElementById('period-select').addEventListener('change', function() {
         updateAllData();
     });
 
@@ -166,6 +170,7 @@ document.addEventListener('DOMContentLoaded', function() {
         updateLeadTimeChart();
         updateAutomatedTestsChart();
         updateTestCasesPerUsChart();
+        updateQaEfficiencyChart();
         updateTrendAnalysis();
     }
     
@@ -218,8 +223,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const months = Object.keys(dadosRelatorio).filter(month => 
             month !== 'historico' && dadosRelatorio[month][currentCenter]
         ).sort();
-        // Retorna os últimos 12 meses disponíveis para exibir o histórico recente
-        return months.slice(-12);
+        
+        const periodSelect = document.getElementById('period-select');
+        const period = periodSelect ? periodSelect.value : '12';
+        
+        if (period === 'all') return months;
+        return months.slice(-parseInt(period));
     }
     
     // Função para formatar mês para exibição
@@ -247,6 +256,15 @@ document.addEventListener('DOMContentLoaded', function() {
         // Converte a pontuação para uma escala de 0-10
         const healthScores10 = healthScores100.map(score => score / 10);
 
+        // Calcular Média Móvel (3 meses)
+        const movingAverage = healthScores10.map((_, idx, arr) => {
+            const window = 3;
+            if (idx < window - 1) return null;
+            let sum = 0;
+            for (let i = 0; i < window; i++) sum += arr[idx - i];
+            return sum / window;
+        });
+
         const gradient = ctx.createLinearGradient(0, 0, 0, 300);
         const lastScore100 = healthScores100[healthScores100.length - 1] || 0;
         
@@ -264,6 +282,11 @@ document.addEventListener('DOMContentLoaded', function() {
             overallHealthChart.data.datasets[0].data = healthScores10;
             overallHealthChart.data.datasets[0].borderColor = colorStart.replace('0.6', '1');
             overallHealthChart.data.datasets[0].backgroundColor = gradient;
+            
+            if (overallHealthChart.data.datasets[1]) {
+                overallHealthChart.data.datasets[1].data = movingAverage;
+            }
+            
             overallHealthChart.options.plugins.title.text = `Índice de Qualidade Geral - ${currentCenter === 'Integracoes' ? 'Integrações' : currentCenter}`;
             overallHealthChart.update();
             return;
@@ -282,6 +305,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     tension: 0.4,
                     pointRadius: 5,
                     pointHoverRadius: 7,
+                }, {
+                    label: 'Tendência (Média Móvel 3m)',
+                    data: movingAverage,
+                    borderColor: 'rgba(88, 89, 91, 0.5)', // Sura Gray com transparência
+                    borderDash: [5, 5],
+                    pointRadius: 0,
+                    borderWidth: 2,
+                    fill: false,
+                    tension: 0.4
                 }]
             },
             options: {
@@ -995,6 +1027,72 @@ document.addEventListener('DOMContentLoaded', function() {
                     legend: { 
                         display: true,
                         position: 'bottom'
+                    }
+                }
+            }
+        });
+    }
+
+    // Gráfico de Eficiência do QA
+    function updateQaEfficiencyChart() {
+        const canvas = document.getElementById('qa-efficiency-chart');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const months = getAvailableMonths();
+
+        const escritaData = [];
+        const execucaoData = [];
+        const reexecucaoData = [];
+
+        months.forEach(month => {
+            const centerData = dadosRelatorio[month]?.[currentCenter];
+            let escrita = 0, execucao = 0, reexecucao = 0;
+
+            if (centerData) {
+                const s1 = centerData.sprint1?.eficiencia || { escrita: 0, execucao: 0, reexecucao: 0 };
+                const s2 = centerData.sprint2?.eficiencia || { escrita: 0, execucao: 0, reexecucao: 0 };
+                
+                escrita = (s1.escrita + s2.escrita) / 2;
+                execucao = (s1.execucao + s2.execucao) / 2;
+                reexecucao = (s1.reexecucao + s2.reexecucao) / 2;
+            }
+            escritaData.push(escrita);
+            execucaoData.push(execucao);
+            reexecucaoData.push(reexecucao);
+        });
+
+        if (qaEfficiencyChart) {
+            qaEfficiencyChart.data.labels = months.map(formatMonth);
+            qaEfficiencyChart.data.datasets[0].data = escritaData;
+            qaEfficiencyChart.data.datasets[1].data = execucaoData;
+            qaEfficiencyChart.data.datasets[2].data = reexecucaoData;
+            qaEfficiencyChart.update();
+            return;
+        }
+
+        qaEfficiencyChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: months.map(formatMonth),
+                datasets: [
+                    { label: 'Escrita (Meta: 7\')', data: escritaData, backgroundColor: 'rgba(52, 152, 219, 0.7)', borderColor: 'rgba(52, 152, 219, 1)', borderWidth: 1 },
+                    { label: 'Execução (Meta: 7\')', data: execucaoData, backgroundColor: 'rgba(46, 204, 113, 0.7)', borderColor: 'rgba(46, 204, 113, 1)', borderWidth: 1 },
+                    { label: 'Reexecução (Meta: 5\')', data: reexecucaoData, backgroundColor: 'rgba(243, 156, 18, 0.7)', borderColor: 'rgba(243, 156, 18, 1)', borderWidth: 1 }
+                ]
+            },
+            options: {
+                layout: { padding: { top: 25 } },
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true, title: { display: true, text: 'Minutos', font: { weight: 'bold', size: 14 } }, grid: { borderDash: [5, 5], color: 'rgba(0,0,0,0.05)' } },
+                    x: { grid: { display: false } }
+                },
+                plugins: {
+                    title: { display: true, text: 'Eficiência QA (Tempos Médios)', font: { size: 18 } },
+                    datalabels: {
+                        anchor: 'end', align: 'top', color: '#555', font: { weight: 'bold', size: 11 },
+                        formatter: (value) => value > 0 ? value.toFixed(1) : ''
                     }
                 }
             }

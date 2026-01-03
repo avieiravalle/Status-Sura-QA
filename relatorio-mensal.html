@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatório Mensal - Qualidade</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="dadosPreenchimento.js"></script>
+    <script src="utils.js"></script>
+    <style>
+        /* --- Variáveis Globais --- */
+        :root {
+            /* Cores Principais */
+            --primary-color: #0033A0; /* Sura Blue */
+            --secondary-color: #00A79D; /* Sura Green */
+            --tertiary-color: #e74c3c;
+            --header-color: #0033A0; /* Sura Blue */
+
+            /* Cores de Fundo e Texto */
+            --body-background: #f9f9f9;
+            --text-color: #58595B; /* Sura Gray */
+            --card-background: white;
+            --table-header-background: #f2f2f2;
+            --table-row-alt-background: #f9f9f9;
+            --summary-card-background: #f9f9f9;
+
+            /* Outros */
+            --border-color: #ddd;
+            --button-hover-color: #00227A; /* Darker Sura Blue */
+            --card-shadow: 0 0 5px rgba(0, 0, 0, 0.05);
+            --container-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            --card-border-radius: 6px;
+            --font-family-base: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        /* --- Estilos Base --- */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: var(--font-family-base);
+        }
+
+        body {
+            background-color: var(--body-background);
+            color: var(--text-color);
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        h1, .section-header {
+            color: var(--header-color);
+        }
+
+        /* --- Layout Principal --- */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background-color: var(--card-background);
+            border-radius: 8px;
+            box-shadow: var(--container-shadow);
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        header #company-logo {
+            max-height: 45px;
+            margin-bottom: 15px;
+        }
+
+        header h1 {
+            margin-bottom: 10px;
+        }
+
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .report-section {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        /* --- Componentes --- */
+        /* Controles (Header e Botões) */
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        select, button {
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            background-color: var(--card-background);
+            font-size: 14px;
+        }
+
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: var(--button-hover-color);
+        }
+
+        #clear-action-plan-btn {
+            background-color: var(--tertiary-color);
+        }
+
+        #clear-action-plan-btn:hover {
+            background-color: #c0392b; /* Tom mais escuro de vermelho */
+        }
+
+        #generate-action-plan-btn {
+            background-color: var(--secondary-color);
+        }
+
+        #generate-action-plan-btn:hover {
+            background-color: #00857B;
+        }
+
+        .action-plan-header button {
+            padding: 5px 10px;
+            font-size: 12px;
+            flex-shrink: 0;
+        }
+
+        /* Seções de Conteúdo (Cards) */
+        .sprint-section, .charts-section, .summary-section, .action-plan-section, .bugs-section {
+            flex: 1;
+            background-color: var(--card-background);
+            border-radius: var(--card-border-radius);
+            box-shadow: var(--card-shadow);
+            padding: 15px;
+            border: 1px solid var(--border-color);
+        }
+
+        .section-header {
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        /* Tabelas de Dados */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+        }
+
+        .data-table th, 
+        .data-table td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .data-table th {
+            background-color: var(--table-header-background);
+            font-weight: 600;
+        }
+
+        .data-row:nth-child(even) {
+            background-color: var(--table-row-alt-background);
+        }
+
+        /* Gráficos */
+        .chart-container {
+            height: 250px;
+            margin-bottom: 20px;
+        }
+
+        /* Resumo Geral */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .product-summary {
+            background-color: var(--summary-card-background);
+            border-radius: var(--card-border-radius);
+            padding: 15px;
+            box-shadow: var(--card-shadow);
+            border: 2px solid transparent; /* Previne o deslocamento do layout */
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out, border-color 0.2s ease-in-out;
+        }
+
+        .product-summary h4 {
+            color: var(--primary-color);
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+
+        .metric-name {
+            font-weight: 500;
+        }
+
+        .metric-value {
+            font-weight: 600;
+        }
+
+        /* --- Classes Utilitárias de Cor --- */
+        .positive {
+            color: var(--secondary-color);
+        }
+
+        .negative {
+            color: var(--tertiary-color);
+        }
+
+        .neutral {
+            color: var(--primary-color);
+        }
+
+        .product-summary.selected-center {
+            border-color: var(--secondary-color);
+            box-shadow: 0 0 8px rgba(0, 167, 157, 0.4); /* Sombra verde Sura */
+            transform: scale(1.02);
+        }
+
+        .action-plan-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+            /* Move border from h2 to this wrapper */
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+        }
+
+        .action-plan-header .section-header {
+            /* Remove styles from h2 since they are on the wrapper now */
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        /* Plano de Ação */
+        .action-plan-section textarea {
+            width: 100%;
+            min-height: 150px;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            font-size: 14px;
+        }
+
+        /* --- Responsividade --- */
+        @media (max-width: 1200px) {
+            .report-section {
+                flex-direction: column;
+            }
+            
+            .summary-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .summary-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 480px) {
+            .summary-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* --- Estilos de Impressão --- */
+        @media print {
+            body {
+                background-color: var(--card-background);
+                padding: 0;
+            }
+            
+            .container {
+                box-shadow: none;
+                max-width: 100%;
+            }
+            
+            .controls {
+                display: none;
+            }
+        }
+
+        /* --- Sistema de Notificação (Modal e Toast) --- */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1050;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toast {
+            padding: 15px 20px;
+            border-radius: var(--card-border-radius);
+            color: white;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            opacity: 0;
+            transform: translateX(100%);
+            animation: slideIn 0.5s forwards, fadeOut 0.5s 2.5s forwards;
+        }
+        .toast.success { background-color: var(--secondary-color); }
+        .toast.error { background-color: var(--tertiary-color); }
+        .toast.info { background-color: var(--primary-color); }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 1000;
+            display: none; /* Controlado por JS */
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: white; padding: 25px; border-radius: 8px;
+            width: 90%; max-width: 500px; text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        .modal-content h3 { color: var(--header-color); margin-bottom: 15px; }
+        .modal-content p { margin-bottom: 25px; }
+        .modal-buttons { display: flex; justify-content: center; gap: 15px; }
+        .modal-buttons button.secondary { background-color: #ccc; }
+        .modal-buttons button.secondary:hover { background-color: #bbb; }
+
+        @keyframes slideIn { to { opacity: 1; transform: translateX(0); } }
+        @keyframes fadeOut { to { opacity: 0; transform: translateX(100%); } }
+    </style>
+</head>
+<body>
+    <div class="container" id="report-container">
+        <header>
+            <img src="logo.png" alt="Logo Sura Seguros" id="company-logo">
+            <h1>Relatório Mensal - Qualidade</h1>
+            <p id="report-date">Dezembro 2025</p>
+        </header>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="month-select">Mês:</label>
+                <select id="month-select">
+                    <!-- Opções de mês serão preenchidas via JavaScript -->
+                </select>
+                
+                <label for="product-select">Produto:</label>
+                <select id="product-select">
+                    <!-- Opções de produto serão preenchidas via JavaScript -->
+                </select>
+            </div>
+
+            <div class="control-group">
+                <button id="feed-data-btn">Alimentar Dados</button>
+                <button id="new-month-btn">Criar Novo Mês</button>
+                <button id="compare-btn">Análise de Tendências</button>
+                <button id="save-pdf-btn">
+                    <span class="btn-text">Salvar como PDF</span>
+                    <span class="btn-loader" style="display: none;">Gerando...</span>
+                </button>
+                <button id="email-pdf-btn">
+                    <span class="btn-text">Enviar por E-mail</span>
+                    <span class="btn-loader" style="display: none;">Enviando...</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="report-section">
+                <div class="sprint-section" id="sprint1-section">
+                    <h2 class="section-header" id="sprint1-header">Sprint 1</h2>
+                    <div id="sprint1-content">
+                        <!-- Conteúdo da Sprint 1 será preenchido via JavaScript -->
+                    </div>
+                </div>
+
+                <div class="sprint-section" id="sprint2-section">
+                    <h2 class="section-header" id="sprint2-header">Sprint 2</h2>
+                    <div id="sprint2-content">
+                        <!-- Conteúdo da Sprint 2 será preenchido via JavaScript -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="bugs-section" id="bugs-section">
+                <h2 class="section-header">Bugs Produtivos</h2>
+                <div id="bugs-content">
+                    <!-- Conteúdo dos Bugs Produtivos será preenchido via JavaScript -->
+                </div>
+            </div>
+
+            <div class="summary-section" id="qa-roi-summary-section">
+                <h2 class="section-header">Análise de Valor e ROI de QA</h2>
+                <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                    <table class="data-table" id="resumo-qa-roi-table">
+                        <thead>
+                            <tr>
+                                <th title="Produto/Center sendo analisado.">Center</th>
+                                <th title="Custo mensal do profissional de QA alocado ao produto.">Custo QA</th>
+                                <th title="Valor líquido gerado pelas atividades de QA. Calculado como: Ganhos - Prejuízos.">Valor das Atividades</th>
+                                <th title="Retorno Sobre o Investimento. Fórmula: ((Valor das Atividades - Custo QA) / Custo QA) * 100%.">ROI (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- As linhas serão preenchidas dinamicamente pelo JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="summary-section" id="summary-section">
+                <h2 class="section-header">Resumo Geral</h2>
+                <div class="summary-grid" id="summary-grid">
+                    <!-- Resumo será preenchido via JavaScript -->
+                </div>
+            </div>
+
+            <div class="action-plan-section" id="action-plan-section">
+                <div class="action-plan-header">
+                    <h2 class="section-header">Planos de Ação</h2>
+                    <div id="action-plan-buttons" style="display: flex; gap: 10px;">
+                        <button id="generate-action-plan-btn" title="Gera uma lista com as métricas que não atingiram a meta">Sugerir Pauta</button>
+                        <button id="clear-action-plan-btn" title="Limpa o plano de ação salvo para o mês e center selecionados">Limpar Plano de Ação</button>
+                    </div>
+                </div>
+                <textarea id="action-plan-textarea" placeholder="Descreva aqui os planos de ação para as métricas que não atingiram a meta..."></textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- Container para Toasts -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Estrutura do Modal -->
+    <div id="custom-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 id="modal-title">Título do Modal</h3>
+            <p id="modal-message">Mensagem do modal...</p>
+            <div id="modal-buttons" class="modal-buttons"></div>
+        </div>
+    </div>
+
+    <!-- Seção oculta para a metodologia do PDF -->
+    <div id="pdf-methodology-section" style="display: none; padding: 20px; font-family: 'Segoe UI', sans-serif; color: #333; background-color: white;">
+        <h2 style="color: #0033A0; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 20px; font-size: 24px;">Metodologia de Cálculo</h2>
+        <div style="font-size: 16px; line-height: 1.6;">
+            <h4 style="color: #0033A0; margin-top: 20px; margin-bottom: 5px;">Cobertura de Testes (Funcional)</h4>
+            <p>Mede o quão bem as User Stories (US) estão cobertas por Casos de Teste (CTs). A meta é ter 3 CTs por US para garantir uma cobertura adequada.</p>
+            <p><strong>Fórmula:</strong> <code>(Total de CTs / (Total de US * 3)) * 100%</code></p>
+            <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
+
+            <h4 style="color: #0033A0; margin-top: 20px; margin-bottom: 5px;">ROI (Retorno sobre Investimento) de QA</h4>
+            <p>Compara o valor monetário gerado pelas atividades de QA com o custo mensal do profissional.</p>
+            <p><strong>Valor das Atividades:</strong> Representa o valor líquido gerado, calculado como a soma dos Ganhos (CTs, bugs evitados) menos os Prejuízos (bugs em produção).</p>
+            <p><strong>Fórmula ROI:</strong> <code>((Valor das Atividades - Custo QA) / Custo QA) * 100%</code></p>
+            <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
+
+            <h4 style="color: #0033A0; margin-top: 20px; margin-bottom: 5px;">Economia de Tempo (Automação)</h4>
+            <p>Mede o tempo economizado (em minutos) ao executar testes de forma automatizada em vez de manual.</p>
+            <p><strong>Fórmula:</strong> <code>Tempo de Execução Manual - Tempo de Execução Automatizado</code></p>
+            <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
+
+            <h4 style="color: #0033A0; margin-top: 20px; margin-bottom: 5px;">Índice de Qualidade (Visão de Tendências)</h4>
+            <p>Um score de 0 a 10 que consolida várias métricas (Cobertura de Código, Pass Rate, Bugs, etc.) em um único indicador para facilitar a comparação da saúde geral do produto ao longo do tempo.</p>
+        </div>
+    </div>
+
+    <script src="relatorio.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Formulário de Preenchimento de Dados</title>
+    <script src="dadosPreenchimento.js"></script>
+    <style>
+        :root {
+            --primary-color: #0033A0; /* Sura Blue */
+            --secondary-color: #00A79D; /* Sura Green */
+            --background-color: #f4f6f9;
+            --text-color: #58595B; /* Sura Gray */
+            --border-color: #ddd;
+            --header-color: #0033A0; /* Sura Blue */
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--background-color);
+            color: var(--text-color);
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        header #company-logo {
+            max-height: 45px;
+            margin-bottom: 15px;
+        }
+
+        h1 {
+            color: var(--header-color);
+        }
+
+        .controls {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 6px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+        }
+
+        label {
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        select, input {
+            padding: 8px 12px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            width: 100%;
+        }
+
+        .form-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+
+        .sprint-form {
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 20px;
+        }
+
+        .sprint-form h3 {
+            color: var(--primary-color);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        .sub-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            padding-left: 15px;
+            border-left: 3px solid #eee;
+        }
+
+        .sub-group label {
+            font-weight: normal;
+            font-size: 0.9em;
+        }
+
+        .actions, .output-section {
+            margin-top: 30px;
+            text-align: center;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px 25px;
+            border-radius: 5px;
+            border: none;
+            background-color: var(--secondary-color);
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #00857B; /* Darker Sura Green */
+        }
+
+        #download-btn {
+            background-color: var(--primary-color);
+        }
+        #download-btn:hover {
+            background-color: #00227A; /* Darker Sura Blue */
+        }
+
+        #clear-btn {
+            background-color: #e74c3c;
+        }
+        #clear-btn:hover {
+            background-color: #c0392b;
+        }
+
+        #archive-btn {
+            background-color: #f39c12; /* Orange */
+        }
+        #archive-btn:hover { background-color: #e67e22; }
+
+        textarea {
+            width: 100%;
+            height: 200px;
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        /* --- Sistema de Notificação (Modal e Toast) --- */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1050;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toast {
+            padding: 15px 20px;
+            border-radius: 6px;
+            color: white;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            opacity: 0;
+            transform: translateX(100%);
+            animation: slideIn 0.5s forwards, fadeOut 0.5s 2.5s forwards;
+        }
+        .toast.success { background-color: var(--secondary-color); }
+        .toast.error { background-color: var(--tertiary-color); }
+        .toast.info { background-color: var(--primary-color); }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 1000;
+            display: none; /* Controlado por JS */
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: white; padding: 25px; border-radius: 8px;
+            width: 90%; max-width: 500px; text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        .modal-content h3 { color: var(--header-color); margin-bottom: 15px; }
+        .modal-content p { margin-bottom: 25px; }
+        .modal-buttons { display: flex; justify-content: center; gap: 15px; }
+        .modal-buttons button.secondary { background-color: #ccc; }
+
+        @keyframes slideIn { to { opacity: 1; transform: translateX(0); } }
+        @keyframes fadeOut { to { opacity: 0; transform: translateX(100%); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <img src="logo.png" alt="Logo Sura Seguros" id="company-logo">
+            <h1>Preenchimento de Dados</h1>
+            <p>Use este formulário para alimentar o arquivo <code>dadosPreenchimento.js</code></p>
+        </header>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="month-select">Selecione o Mês:</label>
+                <select id="month-select"></select>
+            </div>
+            <div class="control-group">
+                <label for="product-select">Selecione o Produto:</label>
+                <select id="product-select"></select>
+            </div>
+        </div>
+
+        <div class="form-container" id="form-container">
+            <!-- Formulários das Sprints serão gerados aqui -->
+        </div>
+
+        <div class="actions">
+            <button id="save-btn">Salvar Alterações</button>
+            <button id="download-btn">Download do Arquivo</button>
+            <button id="archive-btn">Arquivar Antigos</button>
+            <button id="clear-btn">Limpar Formulário</button>
+        </div>
+
+        <div class="output-section" id="output-section" style="display: none;">
+            <label for="output-textarea">Conteúdo gerado para <code>dadosPreenchimento.js</code> (copie e cole ou use o botão de download):</label>
+            <textarea id="output-textarea" readonly></textarea>
+        </div>
+    </div>
+
+    <!-- Container para Toasts -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Estrutura do Modal -->
+    <div id="custom-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 id="modal-title">Título do Modal</h3>
+            <p id="modal-message">Mensagem do modal...</p>
+            <div id="modal-buttons" class="modal-buttons"></div>
+        </div>
+    </div>
+
+    <!-- Modal de Arquivamento -->
+    <div id="archive-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>Arquivar Meses Antigos</h3>
+            <p>Selecione o mês de corte. Todos os meses <b>anteriores</b> a ele serão movidos para um arquivo JSON e removidos da lista atual.</p>
+            <select id="archive-cutoff-select" style="margin-bottom: 20px;"></select>
+            <div class="modal-buttons">
+                <button class="secondary" id="archive-cancel-btn">Cancelar</button>
+                <button class="primary" id="archive-confirm-btn">Arquivar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const monthSelect = document.getElementById('month-select');
+            const productSelect = document.getElementById('product-select');
+            const formContainer = document.getElementById('form-container');
+            const saveBtn = document.getElementById('save-btn');
+            const downloadBtn = document.getElementById('download-btn');
+            const outputSection = document.getElementById('output-section');
+            const outputTextarea = document.getElementById('output-textarea');
+            const clearBtn = document.getElementById('clear-btn');
+            const archiveBtn = document.getElementById('archive-btn');
+            const archiveModal = document.getElementById('archive-modal');
+            const archiveCutoffSelect = document.getElementById('archive-cutoff-select');
+            const archiveConfirmBtn = document.getElementById('archive-confirm-btn');
+            const archiveCancelBtn = document.getElementById('archive-cancel-btn');
+
+            // Cria uma cópia profunda dos dados para ser modificada durante a sessão.
+            let sessionData = structuredClone(dadosRelatorio);
+
+            // 1. Popular seletores
+            function populateSelectors() {
+                monthSelect.innerHTML = '';
+                const months = Object.keys(sessionData).sort().reverse();
+                months.forEach(month => {
+                    const option = new Option(formatMonth(month), month);
+                    monthSelect.add(option);
+                });
+                
+                if (months.length > 0) {
+                    productSelect.innerHTML = '';
+                    const products = Object.keys(sessionData[months[0]]);
+                    products.forEach(product => {
+                        const option = new Option(product === 'Integracoes' ? 'Integrações' : product, product);
+                        productSelect.add(option);
+                    });
+                    loadForm();
+                } else {
+                    formContainer.innerHTML = '<p style="grid-column: span 2; text-align: center;">Nenhum dado disponível.</p>';
+                }
+            }
+
+            populateSelectors();
+
+            // --- Funções Auxiliares de Lógica de Negócios ---
+
+            function ensureDataStructure(productData) {
+                // 1. Migração de Bugs de Produção (Sprint -> Mensal)
+                // Migração do Custo de QA (Sprint -> Mensal)
+                if (productData.sprint1?.qaValor || productData.sprint2?.qaValor) {
+                    // Soma os valores antigos e move para o novo campo mensal
+                    productData.qaValor = (productData.sprint1.qaValor || 0) + (productData.sprint2.qaValor || 0);
+                    delete productData.sprint1.qaValor;
+                    delete productData.sprint2.qaValor;
+                }
+                if (typeof productData.qaValor === 'undefined') productData.qaValor = 0;
+                if (!productData.bugsProducao) {
+                    productData.bugsProducao = { baixa: 0, media: 0, alta: 0 };
+                    // Tenta migrar de sprints antigas se existirem
+                    ['sprint1', 'sprint2'].forEach(sp => {
+                        if (productData[sp]?.bugsProducao) {
+                            productData.bugsProducao.baixa += (productData[sp].bugsProducao.baixa || 0);
+                            productData.bugsProducao.media += (productData[sp].bugsProducao.media || 0);
+                            productData.bugsProducao.alta += (productData[sp].bugsProducao.alta || 0);
+                            delete productData[sp].bugsProducao; // Limpa estrutura antiga
+                        }
+                    });
+                }
+
+                // 2. Garantia de Estrutura das Sprints
+                ['sprint1', 'sprint2'].forEach(sprintKey => {
+                    const sprintNum = sprintKey.replace('sprint', '');
+                    if (!productData[sprintKey]) {
+                        productData[sprintKey] = getEmptySprint(sprintNum);
+                    }
+                    // Garantir nome para estruturas existentes sem ele
+                    if (typeof productData[sprintKey].nome === 'undefined') {
+                        productData[sprintKey].nome = `Sprint ${sprintNum}`;
+                    }
+                    // Migração: Testes Automatizados
+                    if (!productData[sprintKey].testesAutomatizados) {
+                        productData[sprintKey].testesAutomatizados = { cenarios: 0, tempoManual: 0, tempoAutom: 0 };
+                    }
+                    // Garante que os campos de atividades de QA existem
+                    if (typeof productData[sprintKey].ctEscritos === 'undefined') productData[sprintKey].ctEscritos = 0;
+                    if (typeof productData[sprintKey].ctExecutados === 'undefined') productData[sprintKey].ctExecutados = 0;
+                    if (typeof productData[sprintKey].leadTimeBugsProd === 'undefined') productData[sprintKey].leadTimeBugsProd = 0;
+                    
+                    // Migração do campo legado 'reexecucaoBugs' para 'reexecucaoBugsNaoProd'
+                    if (typeof productData[sprintKey].reexecucaoBugs !== 'undefined') {
+                        productData[sprintKey].reexecucaoBugsNaoProd = productData[sprintKey].reexecucaoBugs;
+                        delete productData[sprintKey].reexecucaoBugs;
+                    }
+                    if (typeof productData[sprintKey].reexecucaoBugsNaoProd === 'undefined') productData[sprintKey].reexecucaoBugsNaoProd = 0;
+                    if (typeof productData[sprintKey].reexecucaoBugsProd === 'undefined') productData[sprintKey].reexecucaoBugsProd = 0;
+
+                    // Limpeza de legado caso ainda exista
+                    if (productData[sprintKey].bugsProducao) delete productData[sprintKey].bugsProducao;
+                });
+            }
+
+            function updateObjectFromInputs(targetObj, container) {
+                if (!container || !targetObj) return;
+                const inputs = container.querySelectorAll('input[data-field]');
+                inputs.forEach(input => {
+                    const field = input.dataset.field;
+                    if (input.type === 'text') {
+                        setNestedValue(targetObj, field, input.value || '');
+                    } else { // number
+                        const value = parseFloat(input.value);
+                        setNestedValue(targetObj, field, isNaN(value) ? 0 : value);
+                    }
+                });
+            }
+
+            function validateForm() {
+                const inputs = document.querySelectorAll('#form-container input[data-field]');
+                for (const input of inputs) {
+                    const field = input.dataset.field;
+                    const value = parseFloat(input.value);
+                    const sectionTitle = input.closest('.sprint-form')?.querySelector('h3')?.textContent || 'Seção';
+
+                    if (field === 'passRate' && value > 100) {
+                        showToast(`Erro em ${sectionTitle}: Pass Rate não pode ser maior que 100%.`, 'error');
+                        input.focus();
+                        return false;
+                    }
+                    if (field.startsWith('coberturaCodigo.') && value > 100) {
+                        showToast(`Erro em ${sectionTitle}: Cobertura de Código não pode ser maior que 100%.`, 'error');
+                        input.focus();
+                        return false;
+                    }
+                }
+                return true;
+            }
+
+            function resetProductData(productData) {
+                const emptySprintMetrics = getEmptySprint();
+                ['sprint1', 'sprint2'].forEach(sprintKey => {
+                    const sprintData = productData[sprintKey];
+                    if (sprintData) {
+                        // Zera métricas mantendo metadados (nome, numero) se existirem
+                        for (const metricKey in emptySprintMetrics) {
+                            if (metricKey === 'nome') continue; // Não reseta o nome
+                            if (sprintData.hasOwnProperty(metricKey)) {
+                                sprintData[metricKey] = JSON.parse(JSON.stringify(emptySprintMetrics[metricKey]));
+                            }
+                        }
+                    }
+                });
+                if (productData.bugsProducao) {
+                    productData.bugsProducao = { baixa: 0, media: 0, alta: 0 };
+                }
+            }
+
+            // 2. Gerar campos do formulário e carregar dados (Atualizado para incluir Bugs de Produção Mensal)
+            function loadForm() {
+                const selectedMonth = monthSelect.value;
+                const selectedProduct = productSelect.value;
+                let htmlBuffer = ''; // Acumula o HTML para inserir de uma vez
+
+                if (!selectedMonth || !sessionData[selectedMonth]) return;
+
+                // Garante que a estrutura existe
+                if (!sessionData[selectedMonth]) sessionData[selectedMonth] = {};
+                if (!sessionData[selectedMonth][selectedProduct]) sessionData[selectedMonth][selectedProduct] = {};
+                
+                const productData = sessionData[selectedMonth][selectedProduct];
+
+                // Centraliza a lógica de migração e garantia de estrutura
+                ensureDataStructure(productData);
+
+                htmlBuffer += generateSprintFormHTML('sprint1', productData.sprint1);
+                htmlBuffer += generateSprintFormHTML('sprint2', productData.sprint2);
+                htmlBuffer += generateMonthlyDataFormHTML(productData); // Usa a nova função consolidada
+
+                formContainer.innerHTML = htmlBuffer; // Atualiza o DOM uma única vez
+            }
+
+            function generateMonthlyDataFormHTML(data) {
+                return `
+                    <div class="sprint-form" id="monthly-data-form" style="grid-column: span 2;">
+                        <h3>Dados Consolidados do Mês</h3>
+                        <div class="input-group">
+                            <label></label>
+                            ${generateInput('productData', 'qaValor', data.qaValor || 0, 'Custo Total QA (R$)')}
+                        </div>
+                        <div class="input-group">
+                            <label>Bugs em Produção</label>
+                            <div class="sub-group" style="grid-template-columns: repeat(3, 1fr);">
+                                ${generateInput('productData', 'bugsProducao.baixa', data.bugsProducao.baixa, 'Baixa')}
+                                ${generateInput('productData', 'bugsProducao.media', data.bugsProducao.media, 'Média')}
+                                ${generateInput('productData', 'bugsProducao.alta', data.bugsProducao.alta, 'Alta')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            function generateSprintFormHTML(sprintKey, data) {
+                const sprintNum = sprintKey.replace('sprint', '');
+                const sprintName = data.nome || `Sprint ${sprintNum}`;
+                return `
+                    <div class="sprint-form" id="${sprintKey}-form">
+                        <h3>${sprintName}</h3>
+                        <div class="input-group">
+                            <label for="${sprintKey}-nome">Nome da Sprint</label>
+                            <input type="text" id="${sprintKey}-nome" data-field="nome" value="${sprintName}">
+                        </div>
+                        <div class="input-group">
+                            <label>Cobertura de Código (%)</label>
+                            <div class="sub-group">
+                                ${generateInput(sprintKey, 'coberturaCodigo.linhas', data.coberturaCodigo.linhas, 'Linhas', 'max="100"')}
+                                ${generateInput(sprintKey, 'coberturaCodigo.classes', data.coberturaCodigo.classes, 'Classes', 'max="100"')}
+                                ${generateInput(sprintKey, 'coberturaCodigo.metodos', data.coberturaCodigo.metodos, 'Métodos', 'max="100"')}
+                                ${generateInput(sprintKey, 'coberturaCodigo.branches', data.coberturaCodigo.branches, 'Branches', 'max="100"')}
+                            </div>
+                        </div>
+                        ${generateInput(sprintKey, 'passRate', data.passRate, 'Pass Rate (%)', 'max="100"')}
+                        <div class="input-group">
+                            <label>Bugs Não Produtivos</label>
+                            <div class="sub-group">
+                                ${generateInput(sprintKey, 'bugsNaoProdutivos.baixa', data.bugsNaoProdutivos.baixa, 'Baixa')}
+                                ${generateInput(sprintKey, 'bugsNaoProdutivos.media', data.bugsNaoProdutivos.media, 'Média')}
+                                ${generateInput(sprintKey, 'bugsNaoProdutivos.alta', data.bugsNaoProdutivos.alta, 'Alta')}
+                            </div>
+                        </div>
+                        ${generateInput(sprintKey, 'usSprint', data.usSprint, 'User Stories da Sprint')}
+                        ${generateInput(sprintKey, 'casosTestePorUs', data.casosTestePorUs, 'Total de Casos de Teste')}
+                        ${generateInput(sprintKey, 'leadTimeTestes', data.leadTimeTestes, 'Lead Time de Testes (dias)')}
+                        <!-- O campo coberturaTestesPercentual foi removido pois agora é calculado dinamicamente -->
+                        ${generateInput(sprintKey, 'leadTimeBugs', data.leadTimeBugs, 'Lead Time de Bugs (dias)')}
+                        ${generateInput(sprintKey, 'leadTimeBugsProd', data.leadTimeBugsProd || 0, 'Lead Time de Bugs Prod (dias)')}
+                        <div class="input-group">
+                            <label>Automação de Testes</label>
+                            <div class="sub-group">
+                                ${generateInput(sprintKey, 'testesAutomatizados.cenarios', data.testesAutomatizados.cenarios, 'Cenários')}
+                                ${generateInput(sprintKey, 'testesAutomatizados.tempoManual', data.testesAutomatizados.tempoManual, 'Tempo Manual (min)')}
+                                ${generateInput(sprintKey, 'testesAutomatizados.tempoAutom', data.testesAutomatizados.tempoAutom, 'Tempo Autom. (min)')}
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label>Análise de Valor QA</label>
+                            <div class="sub-group" style="grid-template-columns: repeat(4, 1fr);">
+                                ${generateInput(sprintKey, 'ctEscritos', data.ctEscritos || 0, 'CTs Escritos')}
+                                ${generateInput(sprintKey, 'ctExecutados', data.ctExecutados || 0, 'CTs Executados')}
+                                ${generateInput(sprintKey, 'reexecucaoBugsNaoProd', data.reexecucaoBugsNaoProd || 0, 'Reexec. Não-Prod')}
+                                ${generateInput(sprintKey, 'reexecucaoBugsProd', data.reexecucaoBugsProd || 0, 'Reexec. Prod (Prejuízo)')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            function generateInput(sprintKey, fieldPath, value, label, attributes = '') {
+                const idPath = fieldPath.replace(/\./g, '-');
+                const safeId = sprintKey === 'productData' ? idPath : `${sprintKey}-${idPath}`;
+                return `
+                    <div class="input-group">
+                        <label for="${safeId}">${label}</label>
+                        <input type="number" id="${safeId}" data-field="${fieldPath}" value="${value}" step="0.1" ${attributes}>
+                    </div>
+                `;
+            }
+
+            // --- 3. Salvar dados e gerar arquivo (Refatorado para ser dinâmico) ---
+
+            // Helper para definir um valor em um objeto usando um caminho com pontos (ex: 'cobertura.linhas')
+            function setNestedValue(obj, path, value) {
+                const keys = path.split('.');
+                let current = obj;
+                for (let i = 0; i < keys.length - 1; i++) {
+                    current = current[keys[i]];
+                }
+                current[keys[keys.length - 1]] = value;
+            }
+
+            function saveData() {
+                const selectedMonth = monthSelect.value;
+                const selectedProduct = productSelect.value;
+
+                const productData = sessionData[selectedMonth][selectedProduct];
+                
+                if (!validateForm()) return;
+
+                // Salvar Sprints
+                ['sprint1', 'sprint2'].forEach(sprintKey => {
+                    const form = document.getElementById(`${sprintKey}-form`);
+                    updateObjectFromInputs(productData[sprintKey], form);
+
+                    // Garante que o nome da Sprint seja salvo com o padrão caso esteja vazio
+                    if (!productData[sprintKey].nome || !productData[sprintKey].nome.trim()) {
+                        const sprintNum = sprintKey.replace('sprint', '');
+                        productData[sprintKey].nome = `Sprint ${sprintNum}`;
+                    }
+                });
+
+                // Salvar Dados Mensais (Custo QA e Bugs Prod)
+                const monthlyForm = document.getElementById('monthly-data-form');
+                updateObjectFromInputs(productData, monthlyForm);
+
+                const fileContent = `const dadosRelatorio = ${JSON.stringify(sessionData, null, 2)};`;
+                outputTextarea.value = fileContent;
+                outputSection.style.display = 'block';
+
+                showToast('Dados gerados para atualização. Copie ou faça o download.', 'success');
+            }
+
+            function downloadFile(content, fileName, mimeType = 'text/javascript') {
+                const blob = new Blob([content], { type: mimeType });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+
+            function handleDownload() {
+                const content = outputTextarea.value;
+                if (content) {
+                    downloadFile(content, 'dadosPreenchimento.js');
+                } else {
+                    showModal({
+                        title: 'Atenção',
+                        message: 'Primeiro, clique em "Salvar Alterações" para gerar os dados.',
+                        buttons: [{ text: 'OK', className: 'primary', callback: hideModal }]
+                    });
+                }
+            }
+
+            function clearForm() {
+                const selectedMonth = monthSelect.value;
+                showModal({
+                    title: 'Confirmar Limpeza',
+                    message: `Tem certeza que deseja limpar os dados de TODOS OS PRODUTOS para o mês de ${formatMonth(selectedMonth)}? Os valores serão zerados.`,
+                    buttons: [
+                        { text: 'Cancelar', className: 'secondary', callback: hideModal },
+                        { text: 'Confirmar', className: 'primary', callback: () => {
+                            const productsInMonth = Object.keys(sessionData[selectedMonth]);
+                            productsInMonth.forEach(productKey => {
+                                resetProductData(sessionData[selectedMonth][productKey]);
+                            });
+
+                    // Recarrega o formulário para refletir os dados zerados do produto atual
+                    loadForm();
+
+                    // Atualiza o textarea com o conteúdo do arquivo JS zerado
+                    const fileContent = `const dadosRelatorio = ${JSON.stringify(sessionData, null, 2)};`;
+                    outputTextarea.value = fileContent;
+                    outputSection.style.display = 'block';
+
+                    hideModal();
+                    showToast(`Dados para ${formatMonth(selectedMonth)} foram limpos.`, 'info');
+                        }}
+                    ]
+                });
+            }
+
+            // --- Função de Arquivamento ---
+            function openArchiveModal() {
+                archiveCutoffSelect.innerHTML = '';
+                const months = Object.keys(sessionData).sort(); // Ordem cronológica (antigos primeiro)
+                
+                if (months.length < 2) {
+                    showToast('É necessário ter pelo menos 2 meses para realizar o arquivamento.', 'info');
+                    return;
+                }
+
+                // Adiciona meses ao seletor (começando do segundo mais antigo)
+                for (let i = 1; i < months.length; i++) {
+                    const option = new Option(formatMonth(months[i]), months[i]);
+                    archiveCutoffSelect.add(option);
+                }
+
+                archiveModal.style.display = 'flex';
+            }
+
+            function performArchive() {
+                const cutoffMonth = archiveCutoffSelect.value;
+                if (!cutoffMonth) return;
+
+                const archiveData = {};
+                const monthsToDelete = [];
+
+                Object.keys(sessionData).forEach(month => {
+                    if (month < cutoffMonth) {
+                        archiveData[month] = sessionData[month];
+                        monthsToDelete.push(month);
+                    }
+                });
+
+                if (monthsToDelete.length > 0) {
+                    // Remove do sessionData
+                    monthsToDelete.forEach(month => delete sessionData[month]);
+
+                    // Download do arquivo de arquivo
+                    const archiveFileName = `dados_arquivados_ate_${cutoffMonth}.json`;
+                    downloadFile(JSON.stringify(archiveData, null, 2), archiveFileName, 'application/json');
+
+                    // Atualiza a interface e o textarea de saída
+                    populateSelectors();
+                    const fileContent = `const dadosRelatorio = ${JSON.stringify(sessionData, null, 2)};`;
+                    outputTextarea.value = fileContent;
+                    outputSection.style.display = 'block';
+
+                    showToast(`${monthsToDelete.length} meses foram arquivados.`, 'success');
+                }
+                archiveModal.style.display = 'none';
+            }
+
+            // --- Funções Auxiliares ---
+            function formatMonth(monthStr) {
+                const [year, month] = monthStr.split('-');
+                const date = new Date(year, month - 1);
+                return date.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+            }
+
+            function getEmptySprint(sprintNum = '') {
+                return {
+                    nome: sprintNum ? `Sprint ${sprintNum}` : 'Sprint',
+                    coberturaCodigo: { linhas: 0, classes: 0, metodos: 0, branches: 0 },
+                    passRate: 0,
+                    bugsNaoProdutivos: { baixa: 0, media: 0, alta: 0 },
+                    usSprint: 0,
+                    casosTestePorUs: 0,
+                    leadTimeTestes: 0,
+                    // coberturaTestesPercentual: 0, // Removido
+                    leadTimeBugs: 0,
+                    leadTimeBugsProd: 0,
+                    testesAutomatizados: { cenarios: 0, tempoManual: 0, tempoAutom: 0 },
+                    ctEscritos: 0,
+                    ctExecutados: 0,
+                    reexecucaoBugsNaoProd: 0,
+                    reexecucaoBugsProd: 0
+                };
+            }
+
+            // --- Event Listeners ---
+            formContainer.addEventListener('input', (e) => {
+                if (e.target.matches('input[data-field="nome"]')) {
+                    const sprintForm = e.target.closest('.sprint-form');
+                    const title = sprintForm.querySelector('h3');
+                    if (title) {
+                        // Se vazio, volta para o padrão "Sprint X"
+                        title.textContent = e.target.value.trim() ? e.target.value : `Sprint ${sprintForm.id.replace(/\D/g, '')}`;
+                    }
+                }
+            });
+
+            monthSelect.addEventListener('change', loadForm);
+            productSelect.addEventListener('change', loadForm);
+            saveBtn.addEventListener('click', saveData);
+            downloadBtn.addEventListener('click', handleDownload);
+            clearBtn.addEventListener('click', clearForm);
+            archiveBtn.addEventListener('click', openArchiveModal);
+            archiveConfirmBtn.addEventListener('click', performArchive);
+            archiveCancelBtn.addEventListener('click', () => archiveModal.style.display = 'none');
+
+            // Carga inicial
+            // loadForm() é chamado via populateSelectors
+        });
+
+        // --- Sistema de Notificação (Modal e Toast) ---
+        function showToast(message, type = 'info', duration = 3000) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            toast.style.animation = `slideIn 0.5s forwards, fadeOut 0.5s ${duration / 1000 - 0.5}s forwards`;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), duration);
+        }
+
+        function showModal({ title, message, buttons }) {
+            const modal = document.getElementById('custom-modal');
+            const modalTitle = document.getElementById('modal-title');
+            const modalMessage = document.getElementById('modal-message');
+            const modalButtons = document.getElementById('modal-buttons');
+
+            modalTitle.textContent = title;
+            modalMessage.textContent = message;
+            modalButtons.innerHTML = '';
+
+            buttons.forEach(btnInfo => {
+                const button = document.createElement('button');
+                button.textContent = btnInfo.text;
+                button.className = btnInfo.className;
+                button.addEventListener('click', btnInfo.callback);
+                modalButtons.appendChild(button);
+            });
+
+            modal.style.display = 'flex';
+        }
+
+        function hideModal() {
+            const modal = document.getElementById('custom-modal');
+            modal.style.display = 'none';
+        }
+    </script>
+</body>
+</html>

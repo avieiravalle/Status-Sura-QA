@@ -1,0 +1,13 @@
+# Arquivos de log e temporários
+logs
+*.log
+npm-debug.log*
+
+# Dependências do Node.js
+/node_modules
+
+# Arquivos gerados pelo Cypress
+/cypress/videos/
+/cypress/screenshots/
+/cypress/downloads/
+/cypress/reports/

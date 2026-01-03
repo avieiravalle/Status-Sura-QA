@@ -1,0 +1,15 @@
+{
+  "scripts": {
+    "start": "node server.js",
+    "cy:open": "cypress open",
+    "dev": "concurrently \"npm start\" \"npm run cy:open\"",
+    "test": "concurrently \"npm start\" \"cypress run\" --kill-others --success first"
+  },
+  "dependencies": {
+    "concurrently": "^9.1.0",
+    "cypress": "^15.7.1",
+    "express": "^4.21.1",
+    "mochawesome": "^7.1.3",
+    "nodemailer": "^6.9.13"
+  }
+}

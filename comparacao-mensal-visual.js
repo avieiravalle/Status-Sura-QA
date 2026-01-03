@@ -1,0 +1,1469 @@
+// Script para a página de comparação mensal visual
+// Carrega e exibe os gráficos e análises de tendências
+
+/**
+ * Calcula um "Health Score" geral para um centro em um determinado mês.
+ * O score é uma média ponderada de várias métricas normalizadas.
+ * @param {object} centerData - Dados do centro para um mês.
+ * @returns {number} - O score de 0 a 100.
+ */
+function calculateMonthHealthScore(centerData) {
+    if (!centerData) return 0;
+
+    const { sprint1, sprint2 } = centerData;
+
+    // --- Normalização de Métricas (0-100) ---
+    // Para métricas "quanto maior, melhor", a pontuação é (valor / meta) * 100, com teto de 100.
+    // Para métricas "quanto menor, melhor", a pontuação é (1 - (valor / teto_ruim)) * 100, com piso de 0.
+
+    const s1_cov = getSprintAverageCodeCoverage(sprint1);
+    const s2_cov = getSprintAverageCodeCoverage(sprint2);
+    const avgCoverage = (s1_cov > 0 && s2_cov > 0) ? (s1_cov + s2_cov) / 2 : (s1_cov || s2_cov);
+    const coverageScore = Math.min(100, (avgCoverage / 90) * 100); // Meta: 90%
+
+    const avgPassRate = getAverageSprintMetric(centerData, 'passRate');
+    const passRateScore = Math.min(100, (avgPassRate / 95) * 100); // Meta: 95%
+
+    const avgTestCoverage = getMonthTestCoverage(centerData);
+    const testCoverageScore = Math.min(100, (avgTestCoverage / 90) * 100); // Meta: 90%
+
+    const totalNonProdBugs = getSprintTotalNonProdBugs(sprint1) + getSprintTotalNonProdBugs(sprint2);
+    const nonProdBugsScore = Math.max(0, (1 - (totalNonProdBugs / 20)) * 100); // Teto "ruim": 20 bugs
+
+    const totalProdBugs = getTotalProductionBugs(centerData);
+    const prodBugsScore = Math.max(0, (1 - (totalProdBugs / 10)) * 100); // Teto "ruim": 10 bugs
+
+    const avgLtTests = getAverageSprintMetric(centerData, 'leadTimeTestes');
+    const ltTestScore = Math.max(0, (1 - (avgLtTests / 10)) * 100); // Teto "ruim": 10 dias
+
+    const avgLtBugs = getAverageSprintMetric(centerData, 'leadTimeBugs');
+    const ltBugScore = Math.max(0, (1 - (avgLtBugs / 10)) * 100); // Teto "ruim": 10 dias
+
+    // --- Média Ponderada ---
+    const weights = {
+        coverage: 0.20,
+        passRate: 0.20,
+        testCoverage: 0.15,
+        nonProdBugs: 0.15,
+        prodBugs: 0.15,
+        ltTest: 0.075,
+        ltBug: 0.075,
+    };
+
+    const totalScore =
+        coverageScore * weights.coverage + passRateScore * weights.passRate + testCoverageScore * weights.testCoverage +
+        nonProdBugsScore * weights.nonProdBugs + prodBugsScore * weights.prodBugs + ltTestScore * weights.ltTest + ltBugScore * weights.ltBug;
+
+    return totalScore;
+}
+/**
+ * Adiciona uma imagem de canvas a um PDF, tratando quebras de página para conteúdo longo.
+ * @param {jsPDF} pdf - A instância do jsPDF.
+ * @param {HTMLCanvasElement} canvas - O canvas a ser adicionado.
+ */
+function addCanvasWithPageBreaks(pdf, canvas) {
+    const margin = 10; // 10mm de margem
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = pdf.internal.pageSize.getHeight();
+    const contentWidth = pdfWidth - (margin * 2);
+    const contentHeight = pdfHeight - (margin * 2);
+    const imgData = canvas.toDataURL('image/png');
+    const totalImgHeight = (canvas.height * contentWidth) / canvas.width;
+    let heightLeft = totalImgHeight;
+    let position = 0;
+
+    pdf.addImage(imgData, 'PNG', margin, margin, contentWidth, totalImgHeight);
+    heightLeft -= contentHeight;
+
+    while (heightLeft > 0) {
+        position -= contentHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', margin, position + margin, contentWidth, totalImgHeight);
+        heightLeft -= contentHeight;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Registrar o plugin de datalabels para Chart.js
+    if (typeof ChartDataLabels !== 'undefined') {
+        Chart.register(ChartDataLabels);
+    }
+
+    // Configurações globais para um visual mais "executivo"
+    Chart.defaults.font.family = "'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', sans-serif";
+    Chart.defaults.font.size = 13; // Aumentado o tamanho base da fonte
+    Chart.defaults.plugins.title.font.weight = 'bold';
+    Chart.defaults.plugins.title.font.size = 18; // Títulos maiores por padrão
+    Chart.defaults.plugins.title.color = '#333';
+    Chart.defaults.plugins.legend.labels.usePointStyle = true;
+    Chart.defaults.plugins.legend.labels.pointStyle = 'circle';
+    Chart.defaults.plugins.legend.position = 'top';
+    Chart.defaults.plugins.legend.labels.font = { size: 13 }; // Legendas mais legíveis
+    
+    // Variáveis globais
+    let currentCenter;
+    let codeCoverageChart, bugsChart, leadTimeChart, overallHealthChart, qaValueChart, qaRoiChart, reworkChart, automatedTestsChart, bugsSeverityChart;
+    
+    // Configurar listeners para controles
+    document.getElementById('product-select').addEventListener('change', function() {
+        currentCenter = this.value;
+        updateAllData();
+    });
+
+    document.getElementById('save-pdf-btn').addEventListener('click', saveToPDF);
+    document.getElementById('return-btn').addEventListener('click', function() {
+        window.location.href = 'relatorio-mensal.html';
+    });
+    
+    // Carregar dados iniciais
+    populateProductSelect();
+    updateAllData();
+
+    function populateProductSelect() {
+        const productSelect = document.getElementById('product-select');
+        const allProducts = new Set();
+        
+        Object.keys(dadosRelatorio).forEach(month => {
+            if (month === 'historico') return;
+            Object.keys(dadosRelatorio[month]).forEach(prod => allProducts.add(prod));
+        });
+        
+        const products = Array.from(allProducts).sort();
+        productSelect.innerHTML = products.map(p => `<option value="${p}">${p === 'Integracoes' ? 'Integrações' : p}</option>`).join('');
+        
+        if (products.length > 0) {
+            // Tenta iniciar com 'Policy' por padrão, se não existir, usa o primeiro da lista
+            const defaultCenter = products.includes('Policy') ? 'Policy' : products[0];
+            productSelect.value = defaultCenter;
+            currentCenter = defaultCenter;
+        }
+    }
+    
+    // Atualizar todos os dados
+    function updateAllData() {
+        updateOverallHealthChart();
+        updateSummaryCards();
+        updateCodeCoverageChart();
+        updateBugsChart();
+        updateBugsSeverityChart();
+        updateReworkChart();
+        updateLeadTimeChart();
+        updateQaValueChart();
+        updateQaRoiChart();
+        updateAutomatedTestsChart();
+        updateTrendAnalysis();
+    }
+    
+    // Atualizar cards de resumo
+    function updateSummaryCards() {
+        const months = getAvailableMonths();
+        if (months.length === 0) return;
+        
+        const latestMonth = months[months.length - 1];
+        const monthData = dadosRelatorio[latestMonth]?.[currentCenter];
+        if (!monthData) return;
+
+        const s1_cov = getSprintAverageCodeCoverage(monthData.sprint1);
+        const s2_cov = getSprintAverageCodeCoverage(monthData.sprint2);
+        const averageCoverage = (s1_cov > 0 && s2_cov > 0) ? (s1_cov + s2_cov) / 2 : (s1_cov || s2_cov);
+        const passRate = getAverageSprintMetric(monthData, 'passRate');
+        const testCoverage = getMonthTestCoverage(monthData);
+        const totalBugsNonProd = getSprintTotalNonProdBugs(monthData.sprint1) + getSprintTotalNonProdBugs(monthData.sprint2);
+        const totalBugsProd = getTotalProductionBugs(monthData);
+        const totalBugs = totalBugsNonProd + totalBugsProd;
+
+        const updateCard = (elementId, value, formattedValue, target, higherIsBetter) => {
+            const element = document.getElementById(elementId);
+            if (!element) return;
+            element.textContent = formattedValue;
+            element.className = 'summary-value'; // Reseta classes anteriores
+
+            // Define o status com base na meta (bom, neutro, ruim)
+            const isGood = higherIsBetter ? value >= target : value <= target;
+            const isNeutral = higherIsBetter ? value >= target * 0.9 && value < target : value <= target * 1.15 && value > target;
+
+            if (isGood) {
+                element.classList.add('trend-positive');
+            } else if (isNeutral) {
+                element.classList.add('trend-neutral');
+            } else {
+                element.classList.add('trend-negative');
+            }
+        };
+
+        // Atualiza os cards com cores de status
+        updateCard('pass-rate-value', passRate, passRate.toFixed(1) + '%', 95, true);
+        updateCard('test-coverage-value', testCoverage, testCoverage.toFixed(1) + '%', 90, true);
+        updateCard('bugs-value', totalBugs, totalBugs.toString(), 10, false);
+        updateCard('coverage-value', averageCoverage, averageCoverage.toFixed(1) + '%', 85, true);
+    }
+
+    // Função para obter meses disponíveis ordenados
+    function getAvailableMonths() {
+        const months = Object.keys(dadosRelatorio).filter(month => 
+            month !== 'historico' && dadosRelatorio[month][currentCenter]
+        ).sort();
+        // Retorna todos os meses disponíveis para exibir o histórico completo nos gráficos
+        return months;
+    }
+    
+    // Função para formatar mês para exibição
+    function formatMonth(monthStr) {
+        // Cria a data considerando o fuso horário UTC para evitar problemas de dia anterior
+        const parts = monthStr.split('-');
+        const date = new Date(Date.UTC(parseInt(parts[0]), parseInt(parts[1]) - 1, 1));
+        const month = date.toLocaleString('pt-BR', { month: 'short', timeZone: 'UTC' });
+        const year = date.getUTCFullYear().toString().slice(-2);
+        return `${month}/${year}`;
+    }
+
+    // Gráfico de Saúde Geral
+    function updateOverallHealthChart() {
+        const canvas = document.getElementById('overall-health-chart');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const months = getAvailableMonths();
+
+        const healthScores100 = months.map(month => {
+            const centerData = dadosRelatorio[month]?.[currentCenter];
+            return calculateMonthHealthScore(centerData);
+        });
+
+        // Converte a pontuação para uma escala de 0-10
+        const healthScores10 = healthScores100.map(score => score / 10);
+
+        const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+        const lastScore100 = healthScores100[healthScores100.length - 1] || 0;
+        
+        const getColorStops = (score) => {
+            if (score >= 80) return ['rgba(46, 204, 113, 0.6)', 'rgba(46, 204, 113, 0.1)']; // Verde (base 100)
+            if (score >= 60) return ['rgba(243, 156, 18, 0.6)', 'rgba(243, 156, 18, 0.1)']; // Laranja
+            return ['rgba(231, 76, 60, 0.6)', 'rgba(231, 76, 60, 0.1)']; // Vermelho
+        };
+        const [colorStart, colorEnd] = getColorStops(lastScore100);
+        gradient.addColorStop(0, colorStart);
+        gradient.addColorStop(1, colorEnd);
+
+        if (overallHealthChart) {
+            overallHealthChart.data.labels = months.map(formatMonth);
+            overallHealthChart.data.datasets[0].data = healthScores10;
+            overallHealthChart.data.datasets[0].borderColor = colorStart.replace('0.6', '1');
+            overallHealthChart.data.datasets[0].backgroundColor = gradient;
+            overallHealthChart.update();
+            return;
+        }
+
+        overallHealthChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: months.map(formatMonth),
+                datasets: [{
+                    label: 'Índice de Qualidade Geral',
+                    data: healthScores10,
+                    borderColor: colorStart.replace('0.6', '1'),
+                    backgroundColor: gradient,
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 5,
+                    pointHoverRadius: 7,
+                }]
+            },
+            options: {
+                layout: { padding: { top: 25 } },
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true, max: 10, title: { display: true, text: 'Pontuação (0-10)', font: { weight: 'bold', size: 14 } }, grid: { borderDash: [5, 5], color: 'rgba(0,0,0,0.05)' } },
+                    x: { grid: { display: false } }
+                },
+                plugins: {
+                    legend: { display: false },
+                    title: {
+                        display: true,
+                        text: `Índice de Qualidade Geral - ${currentCenter === 'Integracoes' ? 'Integrações' : currentCenter}`,
+                        font: { size: 20 } // Mantém destaque extra para o gráfico principal
+                    },
+                    datalabels: {
+                        align: 'end',
+                        anchor: 'end',
+                        backgroundColor: (context) => context.dataset.borderColor,
+                        borderRadius: 4,
+                        color: 'white',
+                        font: { weight: 'bold', size: 13 },
+                        formatter: (value) => value.toFixed(1),
+                        offset: 4,
+                        padding: 6,
+                    }
+                }
+            }
+        });
+    }
+
+    // Gráfico de cobertura de código
+    function updateCodeCoverageChart() {
+        const canvas = document.getElementById('code-coverage-chart');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const months = getAvailableMonths();
+        
+        const GOAL = 50; // Meta de cobertura de 85%
+        const averageCoverageData = [];
+        
+        const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+        gradient.addColorStop(0, 'rgba(0, 51, 160, 0.5)');
+        gradient.addColorStop(1, 'rgba(0, 51, 160, 0.0)');
+
+        months.forEach(month => {
+            const centerData = dadosRelatorio[month]?.[currentCenter];
+            const s1_cov = getSprintAverageCodeCoverage(centerData?.sprint1);
+            const s2_cov = getSprintAverageCodeCoverage(centerData?.sprint2);
+            const avg = (s1_cov > 0 && s2_cov > 0) ? (s1_cov + s2_cov) / 2 : (s1_cov || s2_cov);
+            averageCoverageData.push(avg);
+        });
+        
+        const datasets = [
+            {
+                label: 'Cobertura Média',
+                data: averageCoverageData,
+                borderColor: 'rgba(0, 51, 160, 1)', // Sura Blue
+                backgroundColor: gradient,
+                tension: 0.4,
+                fill: true,
+                pointRadius: 5,
+                pointHoverRadius: 7,
+            },
+            {
+                label: `Meta (${GOAL}%)`,
+                data: Array(months.length).fill(GOAL),
+                borderColor: 'rgba(0, 167, 157, 1)', // Sura Green
+                borderDash: [5, 5],
+                pointRadius: 0,
+                fill: false,
+                borderWidth: 2,
+            }
+        ];
+
+        if (codeCoverageChart) {
+            codeCoverageChart.data.labels = months.map(formatMonth);
+            codeCoverageChart.data.datasets = datasets;
+            codeCoverageChart.update();
+            return;
+        }
+
+        codeCoverageChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: months.map(formatMonth),
+                datasets: datasets
+            },
+            options: {
+                layout: { padding: { top: 25 } },
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        suggestedMin: 50,
+                        max: 100,
+                        title: {
+                            display: true,
+                            text: 'Cobertura (%)',
+                            font: { weight: 'bold', size: 14 }
+                        },
+                        grid: { borderDash: [5, 5], color: 'rgba(0,0,0,0.05)' }
+                    },
+                    x: { grid: { display: false } }
+                },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Evolução da Cobertura Geral de Código',
+                        font: { size: 18 }
+                    },
+                    datalabels: {
+                        display: (context) => {
+                            // Apenas no dataset de 'Cobertura Média' e no último ponto
+                            return context.dataset.label === 'Cobertura Média' && context.dataIndex === context.dataset.data.length - 1;
+                        },
+                        align: 'end',
+                        anchor: 'end',
+                        backgroundColor: (context) => context.dataset.borderColor,
+                        borderRadius: 4,
+                        color: 'white',
+                        font: { weight: 'bold', size: 12 },
+                        padding: 4,
+                        offset: 4,
+                        formatter: (value) => value.toFixed(1) + '%'
+                    }
+                }
+            }
+        });
+    }
+    
+    // Gráfico de bugs
+    function updateBugsChart() {
+        const canvas = document.getElementById('bugs-chart');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const months = getAvailableMonths();
+        
+        // Preparar dados para bugs não produtivos e bugs em produção
+        const nonProdBugsData = [];
+        const prodBugsData = [];
+        const monthLabels = [];
+        
+        months.forEach(month => {
+            const centerData = dadosRelatorio[month]?.[currentCenter];
+            if (!centerData) {
+                nonProdBugsData.push(0);
+                prodBugsData.push(0);
+            } else {
+                nonProdBugsData.push(getSprintTotalNonProdBugs(centerData.sprint1) + getSprintTotalNonProdBugs(centerData.sprint2));
+                prodBugsData.push(getTotalProductionBugs(centerData));
+            }
+            monthLabels.push(formatMonth(month));
+        });
+
+        if (bugsChart) {
+            bugsChart.data.labels = monthLabels;
+            bugsChart.data.datasets[0].data = nonProdBugsData;
+            bugsChart.data.datasets[1].data = prodBugsData;
+            bugsChart.update();
+            return;
+        }
+        
+        bugsChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: monthLabels,
+                datasets: [
+                    {
+                        label: 'Bugs Não Produtivos',
+                        data: nonProdBugsData,
+                        backgroundColor: 'rgba(52, 152, 219, 0.8)',
+                        borderColor: 'rgba(52, 152, 219, 1)',
+                        borderWidth: 0,
+                        borderRadius: 6,
+                        barPercentage: 0.7,
+                        categoryPercentage: 0.8
+                    },
+                    {
+                        label: 'Bugs em Produção',
+                        data: prodBugsData,
+                        backgroundColor: 'rgba(231, 76, 60, 0.8)',
+                        borderColor: 'rgba(231, 76, 60, 1)',
+                        borderWidth: 0,
+                        borderRadius: 6,
+                        barPercentage: 0.7,
+                        categoryPercentage: 0.8
+                    }
+                ]
+            },
+            options: {
+                layout: { padding: { top: 20 } },
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        stacked: true,
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Número de Bugs',
+                            font: {
+                                size: 15,
+                                weight: 'bold'
+                            }
+                        },
+                        ticks: {
+                            font: {
+                                size: 13
+                            }
+                        },
+                        grid: { borderDash: [5, 5], color: 'rgba(0,0,0,0.05)' }
+                    },
+                    x: {
+                        stacked: true,
+                        ticks: {
+                            font: { size: 13 }
+                        },
+                        grid: { display: false }
+                    }
+                },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Evolução do Volume de Bugs',
+                        font: { size: 18 }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                        titleColor: '#333',
+                        bodyColor: '#333',
+                        borderColor: '#ddd',
+                        borderWidth: 1,
+                        padding: 12,
+                        cornerRadius: 6
+                    },
+                    datalabels: {
+                        color: '#fff',
+                        font: {
+                            weight: 'bold',
+                            size: 13
+                        },
+                        formatter: function(value) {
+                            return value > 0 ? value : '';
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Gráfico de Bugs por Severidade (Empilhado)
+    function updateBugsSeverityChart() {
+        const canvas = document.getElementById('bugs-severity-chart');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const months = getAvailableMonths();
+
+        const lowData = [];
+        const mediumData = [];
+        const highData = [];
+
+        months.forEach(month => {
+            const centerData = dadosRelatorio[month]?.[currentCenter];
+            let low = 0, medium = 0, high = 0;
+
+            if (centerData) {
+                const s1 = centerData.sprint1 || {};
+                const s2 = centerData.sprint2 || {};
+                
+                // Helper para somar bugs de sprints e produção
+                const getCount = (obj, type) => (obj[type] || 0);
+                const s1Bugs = s1.bugsNaoProdutivos || {};
+                const s2Bugs = s2.bugsNaoProdutivos || {};
+                const prodBugs = getProductionBugsObject(centerData);
+
+                low = getCount(s1Bugs, 'baixa') + getCount(s2Bugs, 'baixa') + prodBugs.baixa;
+                medium = getCount(s1Bugs, 'media') + getCount(s2Bugs, 'media') + prodBugs.media;
+                high = getCount(s1Bugs, 'alta') + getCount(s2Bugs, 'alta') + prodBugs.alta;
+            }
+            lowData.push(low);
+            mediumData.push(medium);
+            highData.push(high);
+        });
+
+        if (bugsSeverityChart) {
+            bugsSeverityChart.data.labels = months.map(formatMonth);
+            bugsSeverityChart.data.datasets[0].data = lowData;
+            bugsSeverityChart.data.datasets[1].data = mediumData;
+            bugsSeverityChart.data.datasets[2].data = highData;
+            bugsSeverityChart.update();
+            return;
+        }
+
+        bugsSeverityChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: months.map(formatMonth),
+                datasets: [
+                    { label: 'Baixa', data: lowData, backgroundColor: 'rgba(46, 204, 113, 0.7)', stack: 'stack0' },
+                    { label: 'Média', data: mediumData, backgroundColor: 'rgba(243, 156, 18, 0.7)', stack: 'stack0' },
+                    { label: 'Alta', data: highData, backgroundColor: 'rgba(231, 76, 60, 0.7)', stack: 'stack0' }
+                ]
+            },
+            options: {
+                layout: { padding: { top: 20 } },
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { stacked: true, grid: { display: false } },
+                    y: { stacked: true, beginAtZero: true, title: { display: true, text: 'Quantidade' }, grid: { borderDash: [5, 5], color: 'rgba(0,0,0,0.05)' } }
+                },
+                plugins: {
+                    title: { display: true, text: 'Distribuição de Bugs por Severidade' },
+                    datalabels: {
+                        color: 'white', font: { weight: 'bold', size: 11 },
+                        formatter: (value) => value > 0 ? value : ''
+                    }
+                }
+            }
+        });
+    }
+
+    // Gráfico de lead time
+    function updateLeadTimeChart() {
+        const canvas = document.getElementById('leadtime-chart');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const months = getAvailableMonths();
+        
+        // Preparar dados para lead time de testes e bugs
+        const leadTimeTestesData = [];
+        const leadTimeBugsData = [];
+        const monthLabels = [];
+        
+        months.forEach(month => {
+            const centerData = dadosRelatorio[month]?.[currentCenter];
+            
+            leadTimeTestesData.push(getAverageSprintMetric(centerData, 'leadTimeTestes'));
+            leadTimeBugsData.push(getAverageSprintMetric(centerData, 'leadTimeBugs'));
+            monthLabels.push(formatMonth(month));
+        });
+        
+        // Criar gradientes para o gráfico
+        const gradientTestes = ctx.createLinearGradient(0, 0, 0, 400);
+        gradientTestes.addColorStop(0, 'rgba(52, 152, 219, 0.5)');
+        gradientTestes.addColorStop(1, 'rgba(52, 152, 219, 0.0)');
+        
+        const gradientBugs = ctx.createLinearGradient(0, 0, 0, 400);
+        gradientBugs.addColorStop(0, 'rgba(231, 76, 60, 0.5)');
+        gradientBugs.addColorStop(1, 'rgba(231, 76, 60, 0.0)');
+
+        if (leadTimeChart) {
+            leadTimeChart.data.labels = monthLabels;
+            leadTimeChart.data.datasets[0].data = leadTimeTestesData;
+            leadTimeChart.data.datasets[1].data = leadTimeBugsData;
+            leadTimeChart.update();
+            return;
+        }
+
+        leadTimeChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: monthLabels,
+                datasets: [
+                    {
+                        label: 'Lead Time de Testes',
+                        data: leadTimeTestesData,
+                        backgroundColor: gradientTestes,
+                        borderColor: 'rgba(52, 152, 219, 1)',
+                        borderWidth: 3,
+                        tension: 0.4,
+                        fill: true,
+                        pointBackgroundColor: 'rgba(52, 152, 219, 1)',
+                        pointRadius: 6,
+                        pointHoverRadius: 8
+                    },
+                    {
+                        label: 'Lead Time de Bugs',
+                        data: leadTimeBugsData,
+                        backgroundColor: gradientBugs,
+                        borderColor: 'rgba(231, 76, 60, 1)',
+                        borderWidth: 3,
+                        tension: 0.4,
+                        fill: true,
+                        pointBackgroundColor: 'rgba(231, 76, 60, 1)',
+                        pointRadius: 6,
+                        pointHoverRadius: 8
+                    }
+                ]
+            },
+            options: {
+                layout: { padding: { top: 25 } },
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Dias',
+                            font: {
+                                size: 15,
+                                weight: 'bold'
+                            }
+                        },
+                        ticks: {
+                            font: {
+                                size: 13
+                            }
+                        },
+                        grid: { borderDash: [5, 5], color: 'rgba(0,0,0,0.05)' }
+                    },
+                    x: {
+                        ticks: {
+                            font: { size: 13 }
+                        },
+                        grid: { display: false }
+                    }
+                },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Evolução do Lead Time (em dias)',
+                        font: { size: 18 }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                        titleColor: '#333',
+                        bodyColor: '#333',
+                        borderColor: '#ddd',
+                        borderWidth: 1,
+                        padding: 12,
+                        cornerRadius: 6,
+                        callbacks: {
+                            label: function(context) {
+                                let value = context.raw;
+                                let label = context.dataset.label || '';
+                                
+                                if (label) {
+                                    label += ': ';
+                                }
+                                
+                                label += value.toFixed(1) + ' dias';
+                                return label;
+                            }
+                        }
+                    },
+                    datalabels: {
+                        display: function(context) {
+                            // Mostrar apenas o último valor de cada série
+                            return context.dataIndex === context.dataset.data.length - 1;
+                        },
+                        backgroundColor: function(context) {
+                            return context.dataset.borderColor;
+                        },
+                        borderRadius: 4,
+                        color: 'white',
+                        font: {
+                            weight: 'bold',
+                            size: 12
+                        },
+                        padding: 6,
+                        offset: 4,
+                        formatter: function(value) {
+                            return value.toFixed(1) + 'd';
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Gráfico de Retrabalho (Rework)
+    function updateReworkChart() {
+        const canvas = document.getElementById('rework-chart');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const months = getAvailableMonths();
+
+        let totalProd = 0;
+        let totalNonProd = 0;
+
+        months.forEach(month => {
+            const centerData = dadosRelatorio[month]?.[currentCenter];
+            if (centerData) {
+                const s1 = centerData.sprint1 || {};
+                const s2 = centerData.sprint2 || {};
+                totalProd += (s1.reexecucaoBugsProd || 0) + (s2.reexecucaoBugsProd || 0);
+                totalNonProd += (s1.reexecucaoBugsNaoProd || 0) + (s2.reexecucaoBugsNaoProd || 0);
+            }
+        });
+
+        if (reworkChart) {
+            reworkChart.data.datasets[0].data = [totalProd, totalNonProd];
+            reworkChart.update();
+            return;
+        }
+
+        reworkChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Reexecução (Prod)', 'Reexecução (Não-Prod)'],
+                datasets: [{
+                    data: [totalProd, totalNonProd],
+                    backgroundColor: [
+                        'rgba(0, 51, 160, 0.7)', // Blue for production issues
+                        'rgba(0, 167, 157, 0.7)'  // Green for non-prod
+                    ],
+                    borderColor: [
+                        '#ffffff',
+                        '#ffffff'
+                    ],
+                    borderWidth: 2,
+                    borderRadius: 5
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '50%',
+                plugins: {
+                    title: { display: true, text: 'Volume de Retrabalho (Total Acumulado)' },
+                    datalabels: {
+                        color: '#fff',
+                        font: { weight: 'bold', size: 14 },
+                        formatter: (value, ctx) => {
+                            if (value === 0) return '';
+                            const dataArr = ctx.chart.data.datasets[0].data;
+                            const sum = dataArr.reduce((a, b) => a + b, 0);
+                            const percentage = (value * 100 / sum).toFixed(1) + "%";
+                            return `${value}\n(${percentage})`;
+                        },
+                        textAlign: 'center'
+                    },
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    }
+
+    // Gráfico de Testes Automatizados
+    function updateAutomatedTestsChart() {
+        const canvas = document.getElementById('automated-tests-chart');
+        if (!canvas) {
+            // Se o canvas não for encontrado, exibe um erro no console e para a função
+            // para não quebrar o resto da página.
+            return;
+        }
+        const ctx = canvas.getContext('2d');
+        const months = getAvailableMonths();
+
+        const automatedTestsData = [];
+        let cumulativeTotal = 0;
+
+        const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+        gradient.addColorStop(0, 'rgba(0, 167, 157, 0.5)'); // Sura Green
+        gradient.addColorStop(1, 'rgba(0, 167, 157, 0.0)');
+
+        months.forEach(month => {
+            const centerData = dadosRelatorio[month]?.[currentCenter];
+            let monthlyAdded = 0;
+
+            if (centerData) {
+                const s1 = centerData.sprint1 || {};
+                const s2 = centerData.sprint2 || {};
+                // CORREÇÃO: Acessa a propriedade 'cenarios' dentro do objeto 'testesAutomatizados'
+                monthlyAdded = (s1.testesAutomatizados?.cenarios || 0) + (s2.testesAutomatizados?.cenarios || 0);
+            }
+            cumulativeTotal += monthlyAdded;
+            automatedTestsData.push(cumulativeTotal);
+        });
+
+        if (automatedTestsChart) {
+            automatedTestsChart.data.labels = months.map(formatMonth);
+            automatedTestsChart.data.datasets[0].data = automatedTestsData;
+            automatedTestsChart.update();
+            return;
+        }
+
+        automatedTestsChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: months.map(formatMonth),
+                datasets: [{
+                    label: 'Total Acumulado de Testes Automatizados',
+                    data: automatedTestsData,
+                    borderColor: 'rgba(0, 167, 157, 1)',
+                    backgroundColor: gradient,
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 5,
+                    pointHoverRadius: 7,
+                }]
+            },
+            options: {
+                layout: { padding: { top: 25 } },
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Quantidade de Testes', font: { weight: 'bold', size: 14 } },
+                        grid: { borderDash: [5, 5], color: 'rgba(0,0,0,0.05)' }
+                    },
+                    x: { grid: { display: false } }
+                },
+                plugins: {
+                    title: { display: true, text: 'Evolução de Testes Automatizados', font: { size: 18 } },
+                    datalabels: {
+                        align: 'end',
+                        anchor: 'end',
+                        backgroundColor: (context) => context.dataset.borderColor,
+                        borderRadius: 4,
+                        color: 'white',
+                        font: { weight: 'bold', size: 12 },
+                        padding: 6,
+                        offset: 4,
+                        formatter: (value) => value > 0 ? value : ''
+                    }
+                }
+            }
+        });
+    }
+
+    // Gráfico de Análise de Valor QA
+    function updateQaValueChart() {
+        const canvas = document.getElementById('qa-value-chart');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const months = getAvailableMonths();
+
+        const valoresAtividades = [];
+        const custos = [];
+
+        months.forEach(month => {
+            const centerData = dadosRelatorio[month]?.[currentCenter];
+            let custoQaMes = 0;
+            let valorAtividadesMes = 0;
+
+            if (centerData) {
+                const { sprint1, sprint2 } = centerData;
+                custoQaMes = centerData.qaValor || 0;
+                
+                const ganhosMes = calcularGanhosSprint(sprint1) + calcularGanhosSprint(sprint2);
+                const prejuizoMes = calcularPrejuizoSprint(sprint1) + calcularPrejuizoSprint(sprint2);
+                valorAtividadesMes = ganhosMes - prejuizoMes;
+            }
+
+            valoresAtividades.push(valorAtividadesMes);
+            custos.push(custoQaMes);
+        });
+
+        if (qaValueChart) {
+            qaValueChart.data.labels = months.map(formatMonth);
+            qaValueChart.data.datasets[0].data = valoresAtividades;
+            qaValueChart.data.datasets[1].data = custos;
+            qaValueChart.update();
+            return;
+        }
+
+        qaValueChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: months.map(formatMonth),
+                datasets: [{
+                    label: 'Valor das Atividades (R$)',
+                    data: valoresAtividades,
+                    backgroundColor: 'rgba(0, 167, 157, 0.7)', // Sura Green
+                    borderRadius: 6,
+                    borderWidth: 0
+                }, {
+                    label: 'Custo QA (R$)',
+                    data: custos,
+                    backgroundColor: 'rgba(231, 76, 60, 0.7)', // Vermelho
+                    borderRadius: 6,
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                layout: { padding: { top: 25 } },
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        type: 'linear',
+                        position: 'left',
+                        title: { display: true, text: 'Valor (R$)', font: { weight: 'bold', size: 14 } },
+                        grid: { borderDash: [5, 5], color: 'rgba(0,0,0,0.05)' }
+                    },
+                    x: { grid: { display: false } }
+                },
+                plugins: { 
+                    title: { display: true, text: 'Análise de Valor (Custo QA vs. Valor das Atividades)' }, 
+                    datalabels: {
+                        display: true,
+                        anchor: (context) => context.dataset.data[context.dataIndex] >= 0 ? 'end' : 'start',
+                        align: (context) => context.dataset.data[context.dataIndex] >= 0 ? 'top' : 'bottom',
+                        font: { weight: 'bold', size: 12 },
+                        formatter: (value) => {
+                            if (value === 0) return '';
+                            return 'R$ ' + Math.round(value).toLocaleString('pt-BR');
+                        },
+                        color: (context) => {
+                            const value = context.dataset.data[context.dataIndex];
+                            return value >= 0 ? '#333' : '#e74c3c';
+                        }
+                    },
+                    legend: {
+                        position: 'bottom',
+                    }
+                }
+            }
+        });
+    }
+
+    // Gráfico de ROI
+    function updateQaRoiChart() {
+        const canvas = document.getElementById('qa-roi-chart');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const months = getAvailableMonths();
+
+        const rois = [];
+
+        months.forEach(month => {
+            const centerData = dadosRelatorio[month]?.[currentCenter];
+            let custoQaMes = 0;
+            let valorAtividadesMes = 0;
+
+            if (centerData) {
+                const { sprint1, sprint2 } = centerData;
+                custoQaMes = centerData.qaValor || 0;
+                const ganhosMes = calcularGanhosSprint(sprint1) + calcularGanhosSprint(sprint2);
+                const prejuizoMes = calcularPrejuizoSprint(sprint1) + calcularPrejuizoSprint(sprint2);
+                valorAtividadesMes = ganhosMes - prejuizoMes;
+            }
+            
+            let roi = 0;
+            if (custoQaMes > 0) {
+                roi = ((valorAtividadesMes - custoQaMes) / custoQaMes) * 100;
+            } else if (valorAtividadesMes > 0) {
+                roi = 500; // Limita em 500% para melhor visualização se o custo for 0
+            }
+
+            rois.push(roi);
+        });
+
+        if (qaRoiChart) {
+            qaRoiChart.data.labels = months.map(formatMonth);
+            qaRoiChart.data.datasets[0].data = rois;
+            qaRoiChart.update();
+            return;
+        }
+
+        qaRoiChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: months.map(formatMonth),
+                datasets: [{
+                    label: 'ROI (%)',
+                    data: rois,
+                    borderColor: (context) => {
+                        const value = context.dataset.data[context.dataIndex];
+                        return value >= 0 ? 'rgba(0, 167, 157, 1)' : 'rgba(231, 76, 60, 1)';
+                    },
+                    segment: {
+                        borderColor: ctx => ctx.p0.raw >= 0 && ctx.p1.raw >= 0 ? 'rgba(0, 167, 157, 1)' : (ctx.p0.raw < 0 && ctx.p1.raw < 0 ? 'rgba(231, 76, 60, 1)' : 'rgba(88, 89, 91, 1)'),
+                    },
+                    tension: 0.3,
+                    fill: false,
+                }, {
+                    label: 'Ponto de Equilíbrio',
+                    data: Array(months.length).fill(0),
+                    borderColor: 'rgba(88, 89, 91, 0.8)', // Sura Gray
+                    borderDash: [5, 5],
+                    pointRadius: 0,
+                    fill: false,
+                    borderWidth: 2,
+                }]
+            },
+            options: {
+                layout: { padding: { top: 25 } },
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        title: { display: true, text: 'ROI (%)', font: { weight: 'bold', size: 14 } },
+                        ticks: {
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        },
+                        grid: { borderDash: [5, 5], color: 'rgba(0,0,0,0.05)' }
+                    },
+                    x: { grid: { display: false } }
+                },
+                plugins: { 
+                    title: { display: true, text: 'Evolução do Retorno sobre Investimento (ROI)' }, 
+                    datalabels: {
+                        display: true,
+                        align: 'top',
+                        color: (context) => context.dataset.data[context.dataIndex] >= 0 ? '#00A79D' : '#e74c3c',
+                        font: { weight: 'bold', size: 12 },
+                        offset: 4,
+                        formatter: (value) => Math.round(value) + '%'
+                    },
+                    legend: {
+                        position: 'bottom',
+                    }
+                }
+            }
+        });
+    }
+
+    // Atualizar a análise de tendências
+    function updateTrendAnalysis() {
+        const months = getAvailableMonths();
+        if (months.length < 2) {
+            document.getElementById('trend-table-body').innerHTML = '<tr><td colspan="5">Não há dados suficientes para análise de tendências</td></tr>';
+            return;
+        }
+        
+        const currentMonthData = dadosRelatorio[months[months.length - 1]]?.[currentCenter];
+        const previousMonthData = dadosRelatorio[months[months.length - 2]]?.[currentCenter];
+        if (!currentMonthData || !previousMonthData) return;
+        
+        const tableBody = document.getElementById('trend-table-body');
+        tableBody.innerHTML = '';
+        
+        // Métricas para análise
+        const metrics = [
+            {
+                name: 'Índice de Qualidade',
+                getCurrentValue: () => calculateMonthHealthScore(currentMonthData) / 10,
+                getPreviousValue: () => calculateMonthHealthScore(previousMonthData) / 10,
+                format: value => value.toFixed(1) + ' / 10',
+                isPositiveIncrease: true,
+                target: 8.0 // Meta de 8.0 em 10
+            },
+            {
+                name: 'Cobertura de Código (média)',
+                getCurrentValue: () => {
+                    const s1 = getSprintAverageCodeCoverage(currentMonthData.sprint1);
+                    const s2 = getSprintAverageCodeCoverage(currentMonthData.sprint2);
+                    return (s1 > 0 && s2 > 0) ? (s1 + s2) / 2 : (s1 || s2);
+                },
+                getPreviousValue: () => {
+                    const s1 = getSprintAverageCodeCoverage(previousMonthData.sprint1);
+                    const s2 = getSprintAverageCodeCoverage(previousMonthData.sprint2);
+                    return (s1 > 0 && s2 > 0) ? (s1 + s2) / 2 : (s1 || s2);
+                },
+                format: value => value.toFixed(1) + '%',
+                isPositiveIncrease: true,
+                target: 90
+            },
+            {
+                name: 'Pass Rate (média)',
+                getCurrentValue: () => getAverageSprintMetric(currentMonthData, 'passRate'),
+                getPreviousValue: () => getAverageSprintMetric(previousMonthData, 'passRate'),
+                format: value => value.toFixed(1) + '%',
+                isPositiveIncrease: true,
+                target: 95
+            },
+            {
+                name: 'Bugs Não Produtivos (total)',
+                getCurrentValue: () => getSprintTotalNonProdBugs(currentMonthData.sprint1) + getSprintTotalNonProdBugs(currentMonthData.sprint2),
+                getPreviousValue: () => getSprintTotalNonProdBugs(previousMonthData.sprint1) + getSprintTotalNonProdBugs(previousMonthData.sprint2),
+                format: value => value,
+                isPositiveIncrease: false,
+                target: 5
+            },
+            {
+                name: 'Bugs em Produção (total)',
+                getCurrentValue: () => getTotalProductionBugs(currentMonthData),
+                getPreviousValue: () => getTotalProductionBugs(previousMonthData),
+                format: value => value,
+                isPositiveIncrease: false,
+                target: 2
+            },
+            {
+                name: 'Cobertura de Testes (média)',
+                getCurrentValue: () => getMonthTestCoverage(currentMonthData),
+                getPreviousValue: () => getMonthTestCoverage(previousMonthData),
+                format: value => value.toFixed(1) + '%',
+                isPositiveIncrease: true,
+                target: 90
+            },
+            {
+                name: 'Lead Time de Testes (média)',
+                getCurrentValue: () => getAverageSprintMetric(currentMonthData, 'leadTimeTestes'),
+                getPreviousValue: () => getAverageSprintMetric(previousMonthData, 'leadTimeTestes'),
+                format: value => value.toFixed(1) + ' dias',
+                isPositiveIncrease: false,
+                target: 2.0
+            },
+            {
+                name: 'Lead Time de Bugs (média)',
+                getCurrentValue: () => getAverageSprintMetric(currentMonthData, 'leadTimeBugs'),
+                getPreviousValue: () => getAverageSprintMetric(previousMonthData, 'leadTimeBugs'),
+                format: value => value.toFixed(1) + ' dias',
+                isPositiveIncrease: false,
+                target: 2.0
+            },
+            {
+                name: 'ROI de QA (Estimado)',
+                getCurrentValue: () => {
+                    const custo = currentMonthData.qaValor || 0;
+                    const val = (calcularGanhosSprint(currentMonthData.sprint1) + calcularGanhosSprint(currentMonthData.sprint2)) - (calcularPrejuizoSprint(currentMonthData.sprint1) + calcularPrejuizoSprint(currentMonthData.sprint2));
+                    return custo > 0 ? ((val - custo) / custo) * 100 : 0;
+                },
+                getPreviousValue: () => {
+                    const custo = previousMonthData.qaValor || 0;
+                    const val = (calcularGanhosSprint(previousMonthData.sprint1) + calcularGanhosSprint(previousMonthData.sprint2)) - (calcularPrejuizoSprint(previousMonthData.sprint1) + calcularPrejuizoSprint(previousMonthData.sprint2));
+                    return custo > 0 ? ((val - custo) / custo) * 100 : 0;
+                },
+                format: value => value.toFixed(1) + '%',
+                isPositiveIncrease: true,
+                target: 0
+            },
+            {
+                name: 'Retrabalho (Bugs Reexecutados)',
+                getCurrentValue: () => {
+                    const s1 = currentMonthData.sprint1 || {};
+                    const s2 = currentMonthData.sprint2 || {};
+                    return (s1.reexecucaoBugsNaoProd || 0) + (s1.reexecucaoBugsProd || 0) + (s2.reexecucaoBugsNaoProd || 0) + (s2.reexecucaoBugsProd || 0);
+                },
+                getPreviousValue: () => {
+                    const s1 = previousMonthData.sprint1 || {};
+                    const s2 = previousMonthData.sprint2 || {};
+                    return (s1.reexecucaoBugsNaoProd || 0) + (s1.reexecucaoBugsProd || 0) + (s2.reexecucaoBugsNaoProd || 0) + (s2.reexecucaoBugsProd || 0);
+                },
+                format: value => value,
+                isPositiveIncrease: false,
+                target: 0
+            },
+            {
+                name: 'Novos Cenários Automatizados',
+                getCurrentValue: () => (currentMonthData.sprint1?.testesAutomatizados?.cenarios || 0) + (currentMonthData.sprint2?.testesAutomatizados?.cenarios || 0),
+                getPreviousValue: () => (previousMonthData.sprint1?.testesAutomatizados?.cenarios || 0) + (previousMonthData.sprint2?.testesAutomatizados?.cenarios || 0),
+                format: value => value,
+                isPositiveIncrease: true,
+                target: 5
+            }
+        ];
+        
+        // Preencher tabela com métricas
+        metrics.forEach(metric => {
+            const currentValue = metric.getCurrentValue();
+            const previousValue = metric.getPreviousValue();
+            const difference = currentValue - previousValue;
+            const percentChange = previousValue !== 0 ? (difference / previousValue) * 100 : (currentValue > 0 ? 100 : 0);
+            
+            let trendClass, trendArrow, statusClass, statusText;
+            if (metric.isPositiveIncrease) {
+                trendClass = difference > 0 ? 'trend-positive' : difference < 0 ? 'trend-negative' : 'trend-neutral';
+                trendArrow = difference > 0 ? '↑' : difference < 0 ? '↓' : '→';
+                
+                // Status baseado na meta
+                if (currentValue >= metric.target) {
+                    statusClass = 'badge-positive';
+                    statusText = 'Atingido';
+                } else if (currentValue >= metric.target * 0.9) {
+                    statusClass = 'badge-neutral';
+                    statusText = 'Próximo';
+                } else {
+                    statusClass = 'badge-negative';
+                    statusText = 'Abaixo';
+                }
+            } else {
+                trendClass = difference < 0 ? 'trend-positive' : difference > 0 ? 'trend-negative' : 'trend-neutral';
+                trendArrow = difference < 0 ? '↓' : difference > 0 ? '↑' : '→';
+                
+                // Status baseado na meta (para métricas onde menor é melhor)
+                if (currentValue <= metric.target) {
+                    statusClass = 'badge-positive';
+                    statusText = 'Atingido';
+                } else if (currentValue <= metric.target * 1.1) {
+                    statusClass = 'badge-neutral';
+                    statusText = 'Próximo';
+                } else {
+                    statusClass = 'badge-negative';
+                    statusText = 'Acima';
+                }
+            }
+            
+            const row = document.createElement('tr');
+            // Adiciona uma classe à linha inteira para estilização opcional (ex: background sutil)
+            row.classList.add(statusClass.replace('badge-', 'status-'));
+
+            row.innerHTML = `
+                <td>${metric.name}</td>
+                <td>${metric.format(previousValue)}</td>
+                <td>${metric.format(currentValue)}</td>
+                <td class="${trendClass}">${percentChange >= 0 ? '+' : ''}${percentChange.toFixed(1)}% ${trendArrow}</td>
+                <td><span class="metric-badge ${statusClass}">${statusText}</span></td>
+            `;
+            tableBody.appendChild(row);
+        });
+    }
+    
+    // Função para salvar o relatório como PDF
+    async function saveToPDF() {
+        const { jsPDF } = window.jspdf;
+        const element = document.getElementById('comparison-container');
+        const productSelect = document.getElementById('product-select');
+        
+        alert('Preparando PDF para todos os centers... Isso pode levar alguns segundos.');
+
+        const originalCenter = currentCenter;
+        const pdf = new jsPDF('p', 'mm', 'a4');
+
+        // --- INÍCIO: Criar Capa ---
+        const logoImg = document.getElementById('company-logo');
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = pdf.internal.pageSize.getHeight();
+        const today = new Date();
+        const formattedDate = today.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        
+        const months = getAvailableMonths();
+        let periodText = 'Análise de Tendências';
+        if (months.length > 0) {
+            const firstMonth = formatMonth(months[0]);
+            const lastMonth = formatMonth(months[months.length - 1]);
+            periodText = months.length > 1 ? `Período de Análise: ${firstMonth} a ${lastMonth}` : `Mês de Análise: ${firstMonth}`;
+        }
+
+        // Adicionar logo
+        if (logoImg && logoImg.complete && logoImg.naturalHeight !== 0) {
+            pdf.addImage(logoImg, 'PNG', (pdfWidth / 2) - 30, 40, 60, 24);
+        }
+
+        // Adicionar Título, Período e Data
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(22);
+        pdf.setTextColor('#0033A0'); // Sura Blue
+        pdf.text('Análise de Tendências de Qualidade', pdfWidth / 2, 85, { align: 'center' });
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(16);
+        pdf.setTextColor('#58595B'); // Sura Gray
+        pdf.text(periodText, pdfWidth / 2, 100, { align: 'center' });
+        pdf.setFontSize(12);
+        pdf.text(`Gerado em: ${formattedDate}`, pdfWidth / 2, pdfHeight - 30, { align: 'center' });
+        // --- FIM: Criar Capa ---
+
+        try {
+            const firstMonthKey = Object.keys(dadosRelatorio).find(k => k !== 'historico');
+            if (!firstMonthKey) {
+                alert('Não há dados para gerar o PDF.');
+                return;
+            }
+            const centerKeys = Object.keys(dadosRelatorio[firstMonthKey]).sort();
+
+            for (let i = 0; i < centerKeys.length; i++) {
+                const centerKey = centerKeys[i];
+
+                // Adiciona uma nova página para cada center, pois a primeira página é a capa.
+                pdf.addPage();
+
+                // Atualiza a UI para o center atual
+                currentCenter = centerKey;
+                productSelect.value = centerKey;
+                updateAllData();
+
+                // Aguarda a renderização dos gráficos
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                // --- ESTRATÉGIA DE CAPTURA FRAGMENTADA ---
+                // Captura a parte principal (Gráficos) e a tabela de tendências separadamente
+                // para evitar quebras de layout e permitir ajuste de escala para caber em uma página.
+
+                const trendSection = document.getElementById('trend-analysis-section');
+                const originalTrendDisplay = trendSection.style.display;
+                trendSection.style.display = 'none'; // Oculta temporariamente para capturar apenas o topo
+
+                // 1. Captura Principal (Gráficos e Resumo)
+                const mainCanvas = await html2canvas(element, {
+                    scale: 1.5, // Reduzido para otimizar memória
+                    useCORS: true,
+                    logging: false,
+                    onclone: (doc) => {
+                        if (doc.defaultView.Chart) doc.defaultView.Chart.defaults.animation = false;
+
+                        const header = doc.querySelector('header');
+                        if (header) header.style.display = 'none';
+                        const controls = doc.querySelector('.controls');
+                        if (controls) controls.style.display = 'none';
+                        
+                        // Garante que a tabela esteja oculta no clone
+                        const cloneTrend = doc.getElementById('trend-analysis-section');
+                        if (cloneTrend) cloneTrend.style.display = 'none';
+
+                        const clonedContainer = doc.getElementById('comparison-container');
+                        if (clonedContainer) {
+                            clonedContainer.style.boxShadow = 'none';
+                            clonedContainer.style.border = 'none';
+                            clonedContainer.style.backgroundColor = 'white'; // Garante fundo branco
+                            clonedContainer.style.padding = '10px';
+
+                            // Adiciona um título customizado para a página do PDF
+                            const centerName = centerKey === 'Integracoes' ? 'Integrações' : centerKey;
+                            const pdfTitle = doc.createElement('div');
+                            pdfTitle.innerHTML = `<h1 style="text-align: center; color: #0033A0; margin-bottom: 10px; font-size: 16px;">Análise de Tendências - ${centerName}</h1>`;
+                            clonedContainer.prepend(pdfTitle);
+                        }
+                    }
+                });
+
+                trendSection.style.display = originalTrendDisplay; // Restaura visibilidade
+
+                // 2. Captura da Tabela de Tendências (Isolada)
+                const trendCanvas = await html2canvas(trendSection, {
+                    scale: 1.5, // Reduzido para otimizar memória
+                    useCORS: true,
+                    logging: false,
+                    onclone: (doc) => {
+                        const cloneTrend = doc.getElementById('trend-analysis-section');
+                        if (cloneTrend) {
+                            cloneTrend.style.margin = '0';
+                            cloneTrend.style.padding = '10px';
+                            cloneTrend.style.boxShadow = 'none';
+                            cloneTrend.style.border = '1px solid #eee';
+                            cloneTrend.style.backgroundColor = 'white';
+                        }
+                    }
+                });
+
+                // 3. Montagem Inteligente no PDF
+                const margin = 10;
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = pdf.internal.pageSize.getHeight();
+                const contentWidth = pdfWidth - (margin * 2);
+                const contentHeight = pdfHeight - (margin * 2);
+
+                const mainImgHeight = (mainCanvas.height * contentWidth) / mainCanvas.width;
+                const trendImgHeight = (trendCanvas.height * contentWidth) / trendCanvas.width;
+                const spacing = 5;
+
+                // Verifica se cabe tudo em uma página
+                if (mainImgHeight + trendImgHeight + spacing <= contentHeight) {
+                    // Cabe perfeitamente
+                    pdf.addImage(mainCanvas, 'PNG', margin, margin, contentWidth, mainImgHeight);
+                    pdf.addImage(trendCanvas, 'PNG', margin, margin + mainImgHeight + spacing, contentWidth, trendImgHeight);
+                } else {
+                    // Não cabe. Tenta escalar para caber (se o estouro for pequeno, ex: até 25%)
+                    const totalNeeded = mainImgHeight + trendImgHeight + spacing;
+                    if (totalNeeded <= contentHeight * 1.25) {
+                        const scaleFactor = contentHeight / totalNeeded;
+                        const newMainH = mainImgHeight * scaleFactor;
+                        const newTrendH = trendImgHeight * scaleFactor;
+                        const newSpacing = spacing * scaleFactor;
+                        
+                        pdf.addImage(mainCanvas, 'PNG', margin, margin, contentWidth, newMainH);
+                        pdf.addImage(trendCanvas, 'PNG', margin, margin + newMainH + newSpacing, contentWidth, newTrendH);
+                    } else {
+                        // Muito grande para escalar. Adiciona em páginas separadas.
+                        // Adiciona Main
+                        if (mainImgHeight <= contentHeight) {
+                            pdf.addImage(mainCanvas, 'PNG', margin, margin, contentWidth, mainImgHeight);
+                            // Tabela na próxima página
+                            pdf.addPage();
+                            pdf.addImage(trendCanvas, 'PNG', margin, margin, contentWidth, trendImgHeight);
+                        } else {
+                            // Main já é maior que a página (improvável com CSS ajustado), escala o Main para caber
+                            pdf.addImage(mainCanvas, 'PNG', margin, margin, contentWidth, contentHeight);
+                            pdf.addPage();
+                            pdf.addImage(trendCanvas, 'PNG', margin, margin, contentWidth, trendImgHeight);
+                        }
+                    }
+                }
+            }
+            
+            // Adiciona a página final de metodologia
+            pdf.addPage();
+            const methodologyElement = document.getElementById('pdf-methodology-section');
+            methodologyElement.style.display = 'block'; // Torna visível para captura
+            const methodologyCanvas = await html2canvas(methodologyElement, {
+                scale: 2,
+                useCORS: true
+            });
+            methodologyElement.style.display = 'none'; // Esconde novamente
+            addCanvasWithPageBreaks(pdf, methodologyCanvas);
+
+            pdf.save(`Comparacao_Mensal_Todos_Centers.pdf`);
+
+        } catch (error) {
+            console.error("Erro ao gerar PDF:", error);
+            alert('Ocorreu um erro ao gerar o PDF. Verifique o console para mais detalhes.');
+        } finally {
+            // Restaura o estado original
+            currentCenter = originalCenter;
+            productSelect.value = originalCenter;
+            updateAllData();
+        }
+    }
+});

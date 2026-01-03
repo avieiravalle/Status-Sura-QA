@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planejamento de Qualidade 2026</title>
+    <link rel="stylesheet" href="metas-2026.css">
+    <script src="dadosMetas.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <img src="logo.png" alt="Logo Sura Seguros" id="company-logo">
+            <h1>Planejamento de Qualidade 2026</h1>
+           
+        </header>
+
+        <div class="main-content">
+            <!-- Seção de Metas de KPIs -->
+            <section class="card kpi-section">
+                <div class="card-header">
+                    <h2>🎯 Metas 2026</h2>
+                </div>
+                <div class="kpi-grid" id="kpi-form">
+                    <div class="input-group">
+                        <label>Cobertura de Código (%)</label>
+                        <input type="number" data-path="metas.coberturaCodigo" step="0.1" min="0" max="100">
+                    </div>
+                    <div class="input-group">
+                        <label>Pass Rate (%)</label>
+                        <input type="number" data-path="metas.passRate" step="0.1" min="0" max="100">
+                    </div>
+                    <div class="input-group">
+                        <label>Cobertura de Testes (%)</label>
+                        <input type="number" data-path="metas.coberturaTestes" step="0.1" min="0" max="100">
+                    </div>
+                    <div class="input-group">
+                        <label>Lead Time Testes (dias)</label>
+                        <input type="number" data-path="metas.leadTimeTestes" step="0.1" min="0">
+                    </div>
+                    <div class="input-group">
+                        <label>Lead Time Bugs (dias)</label>
+                        <input type="number" data-path="metas.leadTimeBugs" step="0.1" min="0">
+                    </div>
+                    <div class="input-group">
+                        <label>Limite Bugs Prod (qtd)</label>
+                        <input type="number" data-path="metas.bugsProducao" step="1" min="0">
+                    </div>
+                    <div class="input-group">
+                        <label>Limite Bugs Não-Prod (qtd)</label>
+                        <input type="number" data-path="metas.bugsNaoProd" step="1" min="0">
+                    </div>
+                    <div class="input-group">
+                        <label>Meta de Automação (cenários/mês)</label>
+                        <input type="number" data-path="metas.automacao" step="1" min="0">
+                    </div>
+                </div>
+            </section>
+
+            <!-- Seção de Linha do Tempo (Metas Mensais) -->
+            <section class="card timeline-section">
+                <div class="card-header">
+                    <div>
+                        <h2>📈 Evolução Mensal das Metas (2026)</h2>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button id="add-timeline-row-btn" class="btn-secondary" title="Adicionar nova meta na tabela">+ Nova Meta</button>
+                        <button id="distribute-btn" class="btn-secondary" title="Calcula valores de Fev a Nov baseado em Jan e Dez">Distribuir Automaticamente</button>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="timeline-table">
+                        <thead>
+                            <tr id="timeline-header-row">
+                                <!-- Gerado via JS -->
+                            </tr>
+                        </thead>
+                        <tbody id="timeline-body">
+                            <!-- Gerado via JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="chart-container" style="position: relative; height: 350px; margin-top: 30px;">
+                    <canvas id="timeline-chart"></canvas>
+                </div>
+            </section>
+
+            <!-- Seção de Atividades -->
+            <section class="card activities-section">
+                <div class="card-header">
+                    <h2>📅 Cronograma de Atividades</h2>
+                    <button id="add-activity-btn" class="btn-secondary">+ Nova Atividade</button>
+                </div>
+                <div class="table-responsive">
+                    <table class="activities-table">
+                        <thead>
+                            <tr>
+                                <th>Atividade / Iniciativa</th>
+                                <th>Responsável</th>
+                                <th>Prazo</th>
+                                <th>Status</th>
+                                <th style="width: 80px;">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="activities-body">
+                            <!-- Linhas geradas via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <div class="actions-bar">
+            <button id="save-btn" class="btn-primary">Salvar Planejamento</button>
+            <button id="save-pdf-btn" class="btn-secondary" style="margin-left: 10px;">Salvar PDF</button>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast-container"></div>
+
+    <script src="metas-2026.js"></script>
+</body>
+</html>

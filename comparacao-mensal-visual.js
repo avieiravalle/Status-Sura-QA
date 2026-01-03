@@ -1,6 +1,33 @@
 // Script para a página de comparação mensal visual
 // Carrega e exibe os gráficos e análises de tendências
 
+const METRIC_TARGETS = {
+    coberturaCodigo: {
+        geral: { value: 50, higherIsBetter: true }
+    },
+    passRate: { value: 90, higherIsBetter: true },
+    coberturaTestesPercentual: { value: 100, higherIsBetter: true },
+    leadTimeTestes: { value: 2.5, higherIsBetter: false },
+    leadTimeBugs: { value: 2.0, higherIsBetter: false },
+    bugsNaoProdutivos: {
+        total: { value: 10, higherIsBetter: false }
+    },
+    bugsProducao: {
+        total: { value: 2, higherIsBetter: false }
+    },
+    healthScore: {
+        target: 8.0,
+        limits: {
+            nonProdBugs: 20,
+            prodBugs: 10,
+            leadTime: 10
+        }
+    },
+    automacao: {
+        cenariosNovos: { value: 5, higherIsBetter: true }
+    }
+};
+
 /**
  * Calcula um "Health Score" geral para um centro em um determinado mês.
  * O score é uma média ponderada de várias métricas normalizadas.
@@ -19,25 +46,25 @@ function calculateMonthHealthScore(centerData) {
     const s1_cov = getSprintAverageCodeCoverage(sprint1);
     const s2_cov = getSprintAverageCodeCoverage(sprint2);
     const avgCoverage = (s1_cov > 0 && s2_cov > 0) ? (s1_cov + s2_cov) / 2 : (s1_cov || s2_cov);
-    const coverageScore = Math.min(100, (avgCoverage / 90) * 100); // Meta: 90%
+    const coverageScore = Math.min(100, (avgCoverage / METRIC_TARGETS.coberturaCodigo.geral.value) * 100);
 
     const avgPassRate = getAverageSprintMetric(centerData, 'passRate');
-    const passRateScore = Math.min(100, (avgPassRate / 95) * 100); // Meta: 95%
+    const passRateScore = Math.min(100, (avgPassRate / METRIC_TARGETS.passRate.value) * 100);
 
     const avgTestCoverage = getMonthTestCoverage(centerData);
-    const testCoverageScore = Math.min(100, (avgTestCoverage / 90) * 100); // Meta: 90%
+    const testCoverageScore = Math.min(100, (avgTestCoverage / METRIC_TARGETS.coberturaTestesPercentual.value) * 100);
 
     const totalNonProdBugs = getSprintTotalNonProdBugs(sprint1) + getSprintTotalNonProdBugs(sprint2);
-    const nonProdBugsScore = Math.max(0, (1 - (totalNonProdBugs / 20)) * 100); // Teto "ruim": 20 bugs
+    const nonProdBugsScore = Math.max(0, (1 - (totalNonProdBugs / METRIC_TARGETS.healthScore.limits.nonProdBugs)) * 100);
 
     const totalProdBugs = getTotalProductionBugs(centerData);
-    const prodBugsScore = Math.max(0, (1 - (totalProdBugs / 10)) * 100); // Teto "ruim": 10 bugs
+    const prodBugsScore = Math.max(0, (1 - (totalProdBugs / METRIC_TARGETS.healthScore.limits.prodBugs)) * 100);
 
     const avgLtTests = getAverageSprintMetric(centerData, 'leadTimeTestes');
-    const ltTestScore = Math.max(0, (1 - (avgLtTests / 10)) * 100); // Teto "ruim": 10 dias
+    const ltTestScore = Math.max(0, (1 - (avgLtTests / METRIC_TARGETS.healthScore.limits.leadTime)) * 100);
 
     const avgLtBugs = getAverageSprintMetric(centerData, 'leadTimeBugs');
-    const ltBugScore = Math.max(0, (1 - (avgLtBugs / 10)) * 100); // Teto "ruim": 10 dias
+    const ltBugScore = Math.max(0, (1 - (avgLtBugs / METRIC_TARGETS.healthScore.limits.leadTime)) * 100);
 
     // --- Média Ponderada ---
     const weights = {
@@ -84,6 +111,7 @@ function addCanvasWithPageBreaks(pdf, canvas) {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+    updateMetricTargets();
     // Registrar o plugin de datalabels para Chart.js
     if (typeof ChartDataLabels !== 'undefined') {
         Chart.register(ChartDataLabels);
@@ -139,6 +167,39 @@ document.addEventListener('DOMContentLoaded', function() {
     populateProductSelect();
     updateAllData();
 
+    function updateMetricTargets() {
+        if (typeof dadosRelatorio === 'undefined' || !dadosRelatorio.metas) return;
+        const metas = dadosRelatorio.metas;
+
+        if (metas.coberturaCodigo && metas.coberturaCodigo.geral !== undefined) {
+            METRIC_TARGETS.coberturaCodigo.geral.value = metas.coberturaCodigo.geral;
+        }
+        if (metas.passRate !== undefined) METRIC_TARGETS.passRate.value = metas.passRate;
+        if (metas.coberturaTestesPercentual !== undefined) METRIC_TARGETS.coberturaTestesPercentual.value = metas.coberturaTestesPercentual;
+        if (metas.leadTimeTestes !== undefined) METRIC_TARGETS.leadTimeTestes.value = metas.leadTimeTestes;
+        if (metas.leadTimeBugs !== undefined) METRIC_TARGETS.leadTimeBugs.value = metas.leadTimeBugs;
+        
+        if (metas.bugsNaoProdutivos && metas.bugsNaoProdutivos.total !== undefined) {
+            METRIC_TARGETS.bugsNaoProdutivos.total.value = metas.bugsNaoProdutivos.total;
+        }
+        if (metas.bugsProducao && metas.bugsProducao.total !== undefined) {
+            METRIC_TARGETS.bugsProducao.total.value = metas.bugsProducao.total;
+        }
+
+        if (metas.healthScore) {
+            if (metas.healthScore.target !== undefined) METRIC_TARGETS.healthScore.target = metas.healthScore.target;
+            if (metas.healthScore.limits) {
+                if (metas.healthScore.limits.nonProdBugs !== undefined) METRIC_TARGETS.healthScore.limits.nonProdBugs = metas.healthScore.limits.nonProdBugs;
+                if (metas.healthScore.limits.prodBugs !== undefined) METRIC_TARGETS.healthScore.limits.prodBugs = metas.healthScore.limits.prodBugs;
+                if (metas.healthScore.limits.leadTime !== undefined) METRIC_TARGETS.healthScore.limits.leadTime = metas.healthScore.limits.leadTime;
+            }
+        }
+
+        if (metas.automacao && metas.automacao.cenariosNovos !== undefined) {
+            METRIC_TARGETS.automacao.cenariosNovos.value = metas.automacao.cenariosNovos;
+        }
+    }
+
     function populateProductSelect() {
         const productSelect = document.getElementById('product-select');
         const allProducts = new Set();
@@ -149,7 +210,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         const products = Array.from(allProducts).sort();
-        productSelect.innerHTML = products.map(p => `<option value="${p}">${p === 'Integracoes' ? 'Integrações' : p}</option>`).join('');
+        productSelect.innerHTML = products.map(p => `<option value="${p}">${formatProductName(p)}</option>`).join('');
         
         if (products.length > 0) {
             // Tenta iniciar com 'Policy' por padrão, se não existir, usa o primeiro da lista
@@ -212,10 +273,10 @@ document.addEventListener('DOMContentLoaded', function() {
         };
 
         // Atualiza os cards com cores de status
-        updateCard('pass-rate-value', passRate, passRate.toFixed(1) + '%', 95, true);
-        updateCard('test-coverage-value', testCoverage, testCoverage.toFixed(1) + '%', 90, true);
-        updateCard('bugs-value', totalBugs, totalBugs.toString(), 10, false);
-        updateCard('coverage-value', averageCoverage, averageCoverage.toFixed(1) + '%', 85, true);
+        updateCard('pass-rate-value', passRate, passRate.toFixed(1) + '%', METRIC_TARGETS.passRate.value, true);
+        updateCard('test-coverage-value', testCoverage, testCoverage.toFixed(1) + '%', METRIC_TARGETS.coberturaTestesPercentual.value, true);
+        updateCard('bugs-value', totalBugs, totalBugs.toString(), METRIC_TARGETS.bugsNaoProdutivos.total.value, false);
+        updateCard('coverage-value', averageCoverage, averageCoverage.toFixed(1) + '%', METRIC_TARGETS.coberturaCodigo.geral.value, true);
     }
 
     // Função para obter meses disponíveis ordenados
@@ -287,7 +348,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 overallHealthChart.data.datasets[1].data = movingAverage;
             }
             
-            overallHealthChart.options.plugins.title.text = `Índice de Qualidade Geral - ${currentCenter === 'Integracoes' ? 'Integrações' : currentCenter}`;
+            overallHealthChart.options.plugins.title.text = `Índice de Qualidade Geral - ${formatProductName(currentCenter)}`;
             overallHealthChart.update();
             return;
         }
@@ -328,7 +389,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     legend: { display: false },
                     title: {
                         display: true,
-                        text: `Índice de Qualidade Geral - ${currentCenter === 'Integracoes' ? 'Integrações' : currentCenter}`,
+                        text: `Índice de Qualidade Geral - ${formatProductName(currentCenter)}`,
                         font: { size: 20 } // Mantém destaque extra para o gráfico principal
                     },
                     datalabels: {
@@ -354,7 +415,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const ctx = canvas.getContext('2d');
         const months = getAvailableMonths();
         
-        const GOAL = 50; // Meta de cobertura de 85%
+        const GOAL = METRIC_TARGETS.coberturaCodigo.geral.value;
         const averageCoverageData = [];
         
         const gradient = ctx.createLinearGradient(0, 0, 0, 400);
@@ -950,7 +1011,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
         const months = getAvailableMonths();
-        const TARGET = 3;
+        const TARGET = 3; // Meta de CTs por US (pode ser movida para config se desejar)
 
         const avgData = [];
 
@@ -1121,7 +1182,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 getPreviousValue: () => calculateMonthHealthScore(previousMonthData) / 10,
                 format: value => value.toFixed(1) + ' / 10',
                 isPositiveIncrease: true,
-                target: 8.0 // Meta de 8.0 em 10
+                target: METRIC_TARGETS.healthScore.target
             },
             {
                 name: 'Cobertura de Código (média)',
@@ -1137,7 +1198,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 },
                 format: value => value.toFixed(1) + '%',
                 isPositiveIncrease: true,
-                target: 90
+                target: METRIC_TARGETS.coberturaCodigo.geral.value
             },
             {
                 name: 'Pass Rate (média)',
@@ -1145,7 +1206,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 getPreviousValue: () => getAverageSprintMetric(previousMonthData, 'passRate'),
                 format: value => value.toFixed(1) + '%',
                 isPositiveIncrease: true,
-                target: 95
+                target: METRIC_TARGETS.passRate.value
             },
             {
                 name: 'Bugs Não Produtivos (total)',
@@ -1153,7 +1214,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 getPreviousValue: () => getSprintTotalNonProdBugs(previousMonthData.sprint1) + getSprintTotalNonProdBugs(previousMonthData.sprint2),
                 format: value => value,
                 isPositiveIncrease: false,
-                target: 5
+                target: METRIC_TARGETS.bugsNaoProdutivos.total.value
             },
             {
                 name: 'Bugs em Produção (total)',
@@ -1161,7 +1222,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 getPreviousValue: () => getTotalProductionBugs(previousMonthData),
                 format: value => value,
                 isPositiveIncrease: false,
-                target: 2
+                target: METRIC_TARGETS.bugsProducao.total.value
             },
             {
                 name: 'Cobertura de Testes (média)',
@@ -1169,7 +1230,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 getPreviousValue: () => getMonthTestCoverage(previousMonthData),
                 format: value => value.toFixed(1) + '%',
                 isPositiveIncrease: true,
-                target: 90
+                target: METRIC_TARGETS.coberturaTestesPercentual.value
             },
             {
                 name: 'Lead Time de Testes (média)',
@@ -1177,7 +1238,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 getPreviousValue: () => getAverageSprintMetric(previousMonthData, 'leadTimeTestes'),
                 format: value => value.toFixed(1) + ' dias',
                 isPositiveIncrease: false,
-                target: 2.0
+                target: METRIC_TARGETS.leadTimeTestes.value
             },
             {
                 name: 'Lead Time de Bugs (média)',
@@ -1185,7 +1246,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 getPreviousValue: () => getAverageSprintMetric(previousMonthData, 'leadTimeBugs'),
                 format: value => value.toFixed(1) + ' dias',
                 isPositiveIncrease: false,
-                target: 2.0
+                target: METRIC_TARGETS.leadTimeBugs.value
             },
             {
                 name: 'Retrabalho (Bugs Reexecutados)',
@@ -1209,7 +1270,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 getPreviousValue: () => (previousMonthData.sprint1?.testesAutomatizados?.cenarios || 0) + (previousMonthData.sprint2?.testesAutomatizados?.cenarios || 0),
                 format: value => value,
                 isPositiveIncrease: true,
-                target: 5
+                target: METRIC_TARGETS.automacao.cenariosNovos.value
             }
         ];
         
@@ -1432,7 +1493,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             clonedContainer.style.minHeight = '0';
 
                             // Adiciona um título customizado para a página do PDF
-                            const centerName = centerKey === 'Integracoes' ? 'Integrações' : centerKey;
+                            const centerName = formatProductName(centerKey);
                             const pdfTitle = doc.createElement('div');
                             pdfTitle.innerHTML = `<h1 style="text-align: center; color: #0033A0; margin-bottom: 10px; font-size: 16px;">Análise de Tendências - ${centerName}</h1>`;
                             clonedContainer.prepend(pdfTitle);

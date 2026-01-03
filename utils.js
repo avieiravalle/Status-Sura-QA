@@ -77,3 +77,11 @@ function getAverageSprintMetric(centerData, metricKey) {
     if (s1 > 0 && s2 > 0) return (s1 + s2) / 2;
     return s1 || s2;
 }
+
+/**
+ * Formata o nome do produto para exibição correta na interface.
+ * Centraliza a regra de negócio para nomes como 'Integracoes'.
+ */
+function formatProductName(name) {
+    return name === 'Integracoes' ? 'Integrações' : name;
+}

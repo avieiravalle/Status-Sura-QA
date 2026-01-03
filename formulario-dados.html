@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Formulário de Preenchimento de Dados</title>
     <script src="dadosPreenchimento.js"></script>
+    <script src="utils.js"></script>
     <style>
         :root {
             --primary-color: #0033A0; /* Sura Blue */
@@ -252,6 +253,7 @@
         <div class="actions">
             <button id="save-btn">Salvar Alterações</button>
             <button id="download-btn">Download do Arquivo</button>
+            <button id="config-metas-btn" style="background-color: #6c757d;">Configurar Metas</button>
             <button id="archive-btn">Arquivar Antigos</button>
             <button id="clear-btn">Limpar Formulário</button>
         </div>
@@ -287,6 +289,20 @@
         </div>
     </div>
 
+    <!-- Modal de Configuração de Metas -->
+    <div id="metas-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 800px; text-align: left;">
+            <h3>Configuração de Metas Globais</h3>
+            <div class="metas-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; max-height: 60vh; overflow-y: auto; padding-right: 10px;">
+                <!-- Inputs gerados via JS -->
+            </div>
+            <div class="modal-buttons" style="margin-top: 20px;">
+                <button class="secondary" id="metas-cancel-btn">Cancelar</button>
+                <button class="primary" id="metas-save-btn">Salvar Metas</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const monthSelect = document.getElementById('month-select');
@@ -302,6 +318,10 @@
             const archiveCutoffSelect = document.getElementById('archive-cutoff-select');
             const archiveConfirmBtn = document.getElementById('archive-confirm-btn');
             const archiveCancelBtn = document.getElementById('archive-cancel-btn');
+            const configMetasBtn = document.getElementById('config-metas-btn');
+            const metasModal = document.getElementById('metas-modal');
+            const metasSaveBtn = document.getElementById('metas-save-btn');
+            const metasCancelBtn = document.getElementById('metas-cancel-btn');
 
             // Cria uma cópia profunda dos dados para ser modificada durante a sessão.
             let sessionData = structuredClone(dadosRelatorio);
@@ -319,7 +339,7 @@
                     productSelect.innerHTML = '';
                     const products = Object.keys(sessionData[months[0]]);
                     products.forEach(product => {
-                        const option = new Option(product === 'Integracoes' ? 'Integrações' : product, product);
+                        const option = new Option(formatProductName(product), product);
                         productSelect.add(option);
                     });
                     loadForm();
@@ -597,6 +617,10 @@
                 const keys = path.split('.');
                 let current = obj;
                 for (let i = 0; i < keys.length - 1; i++) {
+                    // Cria objeto intermediário se não existir
+                    if (!current[keys[i]]) {
+                        current[keys[i]] = {};
+                    }
                     current = current[keys[i]];
                 }
                 current[keys[keys.length - 1]] = value;
@@ -751,6 +775,104 @@
                 archiveModal.style.display = 'none';
             }
 
+            // --- Lógica de Metas ---
+            const defaultMetas = {
+                coberturaCodigo: { linhas: 50, classes: 50, metodos: 50, branches: 50, geral: 50 },
+                passRate: 90,
+                coberturaTestesPercentual: 100,
+                leadTimeTestes: 2.5,
+                leadTimeBugs: 2.0,
+                leadTimeBugsProd: 2.0,
+                bugsNaoProdutivos: { baixa: 5, media: 3, alta: 1, total: 10 },
+                bugsProducao: { baixa: 5, media: 2, alta: 0, total: 2 },
+                eficienciaQa: { escrita: 7, execucao: 7, reexecucao: 5 },
+                automacao: { cenariosNovos: 5 },
+                healthScore: { target: 8.0, limits: { nonProdBugs: 20, prodBugs: 10, leadTime: 10 } }
+            };
+
+            function openMetasModal() {
+                // Garante que existe estrutura de metas na sessão
+                if (!sessionData.metas) {
+                    sessionData.metas = JSON.parse(JSON.stringify(defaultMetas));
+                }
+                renderMetasForm(sessionData.metas);
+                metasModal.style.display = 'flex';
+            }
+
+            function renderMetasForm(metas) {
+                const metasGrid = document.querySelector('.metas-grid');
+                let html = '';
+                
+                const group = (title, content) => `<div style="grid-column: span 2; border-bottom: 1px solid #eee; margin-top: 10px; padding-bottom: 5px; font-weight: bold; color: var(--primary-color);">${title}</div>${content}`;
+                const input = (path, label, value, step=1) => `
+                    <div class="input-group">
+                        <label>${label}</label>
+                        <input type="number" class="meta-input" data-path="${path}" value="${value}" step="${step}">
+                    </div>`;
+
+                // Cobertura Código
+                html += group('Cobertura de Código (%)', 
+                    input('coberturaCodigo.linhas', 'Linhas', metas.coberturaCodigo?.linhas ?? 50) +
+                    input('coberturaCodigo.classes', 'Classes', metas.coberturaCodigo?.classes ?? 50) +
+                    input('coberturaCodigo.metodos', 'Métodos', metas.coberturaCodigo?.metodos ?? 50) +
+                    input('coberturaCodigo.branches', 'Branches', metas.coberturaCodigo?.branches ?? 50) +
+                    input('coberturaCodigo.geral', 'Geral (Visual)', metas.coberturaCodigo?.geral ?? 50)
+                );
+
+                // Qualidade Geral
+                html += group('Métricas Gerais', 
+                    input('passRate', 'Pass Rate (%)', metas.passRate ?? 90) +
+                    input('coberturaTestesPercentual', 'Cob. Testes (%)', metas.coberturaTestesPercentual ?? 100) +
+                    input('leadTimeTestes', 'Lead Time Testes (dias)', metas.leadTimeTestes ?? 2.5, 0.1) +
+                    input('leadTimeBugs', 'Lead Time Bugs (dias)', metas.leadTimeBugs ?? 2.0, 0.1) +
+                    input('leadTimeBugsProd', 'Lead Time Bugs Prod (dias)', metas.leadTimeBugsProd ?? 2.0, 0.1)
+                );
+
+                // Bugs
+                html += group('Limites de Bugs (Não Produtivos)', 
+                    input('bugsNaoProdutivos.baixa', 'Baixa', metas.bugsNaoProdutivos?.baixa ?? 5) +
+                    input('bugsNaoProdutivos.media', 'Média', metas.bugsNaoProdutivos?.media ?? 3) +
+                    input('bugsNaoProdutivos.alta', 'Alta', metas.bugsNaoProdutivos?.alta ?? 1) +
+                    input('bugsNaoProdutivos.total', 'Total', metas.bugsNaoProdutivos?.total ?? 10)
+                );
+
+                html += group('Limites de Bugs (Produção)', 
+                    input('bugsProducao.baixa', 'Baixa', metas.bugsProducao?.baixa ?? 5) +
+                    input('bugsProducao.media', 'Média', metas.bugsProducao?.media ?? 2) +
+                    input('bugsProducao.alta', 'Alta', metas.bugsProducao?.alta ?? 0) +
+                    input('bugsProducao.total', 'Total', metas.bugsProducao?.total ?? 2)
+                );
+
+                // Eficiência
+                html += group('Eficiência QA (minutos)', 
+                    input('eficienciaQa.escrita', 'Escrita', metas.eficienciaQa?.escrita ?? 7) +
+                    input('eficienciaQa.execucao', 'Execução', metas.eficienciaQa?.execucao ?? 7) +
+                    input('eficienciaQa.reexecucao', 'Reexecução', metas.eficienciaQa?.reexecucao ?? 5)
+                );
+
+                // Outros
+                html += group('Outros', 
+                    input('automacao.cenariosNovos', 'Automação (Novos Cenários)', metas.automacao?.cenariosNovos ?? 5) +
+                    input('healthScore.target', 'Meta Health Score', metas.healthScore?.target ?? 8.0, 0.1)
+                );
+                
+                metasGrid.innerHTML = html;
+            }
+
+            function saveMetas() {
+                const inputs = document.querySelectorAll('.meta-input');
+                if (!sessionData.metas) sessionData.metas = {};
+
+                inputs.forEach(input => {
+                    const path = input.dataset.path;
+                    const value = parseFloat(input.value);
+                    setNestedValue(sessionData.metas, path, isNaN(value) ? 0 : value);
+                });
+
+                metasModal.style.display = 'none';
+                showToast('Metas atualizadas. Clique em "Salvar Alterações" para persistir no arquivo.', 'success');
+            }
+
             // --- Funções Auxiliares ---
             function formatMonth(monthStr) {
                 const [year, month] = monthStr.split('-');
@@ -798,6 +920,9 @@
             archiveBtn.addEventListener('click', openArchiveModal);
             archiveConfirmBtn.addEventListener('click', performArchive);
             archiveCancelBtn.addEventListener('click', () => archiveModal.style.display = 'none');
+            configMetasBtn.addEventListener('click', openMetasModal);
+            metasSaveBtn.addEventListener('click', saveMetas);
+            metasCancelBtn.addEventListener('click', () => metasModal.style.display = 'none');
 
             // Carga inicial
             // loadForm() é chamado via populateSelectors

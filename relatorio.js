@@ -21,12 +21,14 @@ const METRIC_TARGETS = {
     bugsNaoProdutivos: {
         baixa: { value: 5, higherIsBetter: false },
         media: { value: 3, higherIsBetter: false },
-        alta: { value: 1, higherIsBetter: false }
+        alta: { value: 1, higherIsBetter: false },
+        total: { value: 10, higherIsBetter: false }
     },
     bugsProducao: {
         baixa: { value: 5, higherIsBetter: false },
         media: { value: 2, higherIsBetter: false },
-        alta: { value: 0, higherIsBetter: false }
+        alta: { value: 0, higherIsBetter: false },
+        total: { value: 2, higherIsBetter: false }
     },
     eficienciaQa: {
         escrita: { value: 7, higherIsBetter: false },
@@ -37,6 +39,7 @@ const METRIC_TARGETS = {
 
 // --- Inicialização ---
 document.addEventListener('DOMContentLoaded', function() {
+    updateMetricTargets();
     initializeControls();
 
     document.getElementById('feed-data-btn').addEventListener('click', () => window.open('formulario-dados.html', '_blank'));
@@ -53,6 +56,44 @@ document.addEventListener('DOMContentLoaded', function() {
     // Carregar relatório inicial
     updateReport();
 });
+
+function updateMetricTargets() {
+    if (typeof dadosRelatorio === 'undefined' || !dadosRelatorio.metas) return;
+    const metas = dadosRelatorio.metas;
+    const setVal = (obj, key, val) => { if (obj[key]) obj[key].value = val; };
+
+    if (metas.coberturaCodigo) {
+        setVal(METRIC_TARGETS.coberturaCodigo, 'linhas', metas.coberturaCodigo.linhas);
+        setVal(METRIC_TARGETS.coberturaCodigo, 'classes', metas.coberturaCodigo.classes);
+        setVal(METRIC_TARGETS.coberturaCodigo, 'metodos', metas.coberturaCodigo.metodos);
+        setVal(METRIC_TARGETS.coberturaCodigo, 'branches', metas.coberturaCodigo.branches);
+    }
+    if (metas.passRate !== undefined) METRIC_TARGETS.passRate.value = metas.passRate;
+    if (metas.coberturaTestesPercentual !== undefined) METRIC_TARGETS.coberturaTestesPercentual.value = metas.coberturaTestesPercentual;
+    if (metas.leadTimeTestes !== undefined) METRIC_TARGETS.leadTimeTestes.value = metas.leadTimeTestes;
+    if (metas.leadTimeBugs !== undefined) METRIC_TARGETS.leadTimeBugs.value = metas.leadTimeBugs;
+    if (metas.leadTimeBugsProd !== undefined) METRIC_TARGETS.leadTimeBugsProd.value = metas.leadTimeBugsProd;
+
+    if (metas.bugsNaoProdutivos) {
+        setVal(METRIC_TARGETS.bugsNaoProdutivos, 'baixa', metas.bugsNaoProdutivos.baixa);
+        setVal(METRIC_TARGETS.bugsNaoProdutivos, 'media', metas.bugsNaoProdutivos.media);
+        setVal(METRIC_TARGETS.bugsNaoProdutivos, 'alta', metas.bugsNaoProdutivos.alta);
+        setVal(METRIC_TARGETS.bugsNaoProdutivos, 'total', metas.bugsNaoProdutivos.total);
+    }
+
+    if (metas.bugsProducao) {
+        setVal(METRIC_TARGETS.bugsProducao, 'baixa', metas.bugsProducao.baixa);
+        setVal(METRIC_TARGETS.bugsProducao, 'media', metas.bugsProducao.media);
+        setVal(METRIC_TARGETS.bugsProducao, 'alta', metas.bugsProducao.alta);
+        setVal(METRIC_TARGETS.bugsProducao, 'total', metas.bugsProducao.total);
+    }
+
+    if (metas.eficienciaQa) {
+        setVal(METRIC_TARGETS.eficienciaQa, 'escrita', metas.eficienciaQa.escrita);
+        setVal(METRIC_TARGETS.eficienciaQa, 'execucao', metas.eficienciaQa.execucao);
+        setVal(METRIC_TARGETS.eficienciaQa, 'reexecucao', metas.eficienciaQa.reexecucao);
+    }
+}
 
 /**
  * Inicializa os controles de seleção (mês e produto), define o estado inicial e anexa os listeners.
@@ -90,7 +131,7 @@ function initializeControls() {
     productList.forEach(productKey => {
         const option = document.createElement('option');
         option.value = productKey;
-        option.textContent = productKey === 'Integracoes' ? 'Integrações' : productKey;
+        option.textContent = formatProductName(productKey);
         productSelect.appendChild(option);
     });
 
@@ -119,23 +160,14 @@ function updateReport() {
         return;
     }
 
-    const previousMonthKey = getPreviousMonthKey(appState.currentMonth);
-    const previousCenterData = previousMonthKey ? dadosRelatorio[previousMonthKey]?.[appState.currentCenter] : null;
-
     updateReportDate();
-    updateSprintData(previousCenterData);
-    updateBugsProdutivos(previousCenterData);
+    updateSprintData();
+    updateBugsProdutivos();
     updateSummary();
     loadActionPlan();
 
     // Garante que o plano de ação está habilitado se houver dados
     document.getElementById('action-plan-textarea').disabled = false;
-}
-
-function getPreviousMonthKey(currentMonthKey) {
-    const sortedMonths = Object.keys(dadosRelatorio).sort();
-    const currentIndex = sortedMonths.indexOf(currentMonthKey);
-    return currentIndex > 0 ? sortedMonths[currentIndex - 1] : null;
 }
 
 /**
@@ -166,7 +198,7 @@ function updateReportDate() {
 /**
  * Atualiza as seções de dados das Sprints.
  */
-function updateSprintData(previousCenterData) {
+function updateSprintData() {
     const { sprint1, sprint2 } = dadosRelatorio[appState.currentMonth][appState.currentCenter];
 
     // Atualiza os títulos das seções (H2) com o nome definido pelo usuário
@@ -189,7 +221,7 @@ function updateSprintData(previousCenterData) {
 /**
  * Atualiza a seção de Bugs Produtivos com os dados consolidados do mês.
  */
-function updateBugsProdutivos(previousCenterData) {
+function updateBugsProdutivos() {
     const centerData = dadosRelatorio[appState.currentMonth][appState.currentCenter];
     const bugsContent = document.getElementById('bugs-content');
     bugsContent.replaceChildren(); // Limpa conteúdo anterior
@@ -433,7 +465,7 @@ function updateSummary() {
             name: 'Bugs (Não Prod.)', unit: '', 
             getValue: (s1, s2) => getSprintTotalNonProdBugs(s1) + getSprintTotalNonProdBugs(s2), 
             getStatus: (v) => {
-                const target = METRIC_TARGETS.bugsNaoProdutivos.total || 10;
+                const target = METRIC_TARGETS.bugsNaoProdutivos.total.value;
                 return v <= target ? 'positive' : v <= (target + 5) ? 'neutral' : 'negative';
             }
         },
@@ -441,7 +473,7 @@ function updateSummary() {
             const bugs = getProductionBugsObject(centerData);
             return bugs.baixa + bugs.media + bugs.alta;
         }, getStatus: (v) => {
-            const target = METRIC_TARGETS.bugsProducao.total || 2;
+            const target = METRIC_TARGETS.bugsProducao.total.value;
             return v <= target ? 'positive' : v <= (target + 2) ? 'neutral' : 'negative';
         } },
         { name: 'Lead Time Testes', unit: ' dias', getValue: (s1, s2) => (s1.leadTimeTestes + s2.leadTimeTestes) / 2, getStatus: (v) => v <= METRIC_TARGETS.leadTimeTestes.value ? 'positive' : v <= (METRIC_TARGETS.leadTimeTestes.value + 0.5) ? 'neutral' : 'negative' },
@@ -601,16 +633,16 @@ function identifyMissedMetrics() {
 
     // Validação de Bugs Não Produtivos (Total) - Usa meta dinâmica
     const totalNonProdBugs = getSprintTotalNonProdBugs(sprint1) + getSprintTotalNonProdBugs(sprint2);
-    if (METRIC_TARGETS.bugsNaoProdutivos.total !== undefined) {
-        check('Bugs Não Produtivos (Total)', totalNonProdBugs, { value: METRIC_TARGETS.bugsNaoProdutivos.total, higherIsBetter: false });
+    if (METRIC_TARGETS.bugsNaoProdutivos.total) {
+        check('Bugs Não Produtivos (Total)', totalNonProdBugs, METRIC_TARGETS.bugsNaoProdutivos.total);
     }
 
     const prodBugs = getProductionBugsObject(centerData);
     
     // Validação de Bugs de Produção (Total) - Usa meta dinâmica
     const totalProdBugs = prodBugs.baixa + prodBugs.media + prodBugs.alta;
-    if (METRIC_TARGETS.bugsProducao.total !== undefined) {
-        check('Bugs Produção (Total)', totalProdBugs, { value: METRIC_TARGETS.bugsProducao.total, higherIsBetter: false });
+    if (METRIC_TARGETS.bugsProducao.total) {
+        check('Bugs Produção (Total)', totalProdBugs, METRIC_TARGETS.bugsProducao.total);
     }
 
     ['baixa', 'media', 'alta'].forEach(type => {
@@ -827,7 +859,7 @@ async function saveToPDF(mode = 'download') {
                     const pdfTitle = doc.createElement('div');
                     pdfTitle.style.textAlign = 'center';
                     pdfTitle.style.marginBottom = '20px';
-                    const centerName = centerKey === 'Integracoes' ? 'Integrações' : centerKey;
+                    const centerName = formatProductName(centerKey);
                     const dateText = new Date(appState.currentMonth).toLocaleString('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' });
                     pdfTitle.innerHTML = `<h1 style="color: var(--header-color); margin-bottom: 5px;">Relatório de Qualidade - ${centerName}</h1><p>${dateText}</p>`;
                     if (clonedContainer) {

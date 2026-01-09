@@ -6,6 +6,7 @@ const METRIC_TARGETS = {
         geral: { value: 50, higherIsBetter: true }
     },
     passRate: { value: 90, higherIsBetter: true },
+    densidadeTestes: { value: 4, higherIsBetter: true },
     coberturaTestesPercentual: { value: 100, higherIsBetter: true },
     leadTimeTestes: { value: 2.5, higherIsBetter: false },
     leadTimeBugs: { value: 2.0, higherIsBetter: false },
@@ -51,7 +52,7 @@ function calculateMonthHealthScore(centerData) {
     const avgPassRate = getAverageSprintMetric(centerData, 'passRate');
     const passRateScore = Math.min(100, (avgPassRate / METRIC_TARGETS.passRate.value) * 100);
 
-    const avgTestCoverage = getMonthTestCoverage(centerData);
+    const avgTestCoverage = getMonthTestCoverage(centerData, METRIC_TARGETS.densidadeTestes.value);
     const testCoverageScore = Math.min(100, (avgTestCoverage / METRIC_TARGETS.coberturaTestesPercentual.value) * 100);
 
     const totalNonProdBugs = getSprintTotalNonProdBugs(sprint1) + getSprintTotalNonProdBugs(sprint2);
@@ -189,6 +190,7 @@ document.addEventListener('DOMContentLoaded', function() {
             METRIC_TARGETS.coberturaCodigo.geral.value = metas.coberturaCodigo.geral;
         }
         if (metas.passRate !== undefined) METRIC_TARGETS.passRate.value = metas.passRate;
+        if (metas.densidadeTestes !== undefined) METRIC_TARGETS.densidadeTestes.value = metas.densidadeTestes;
         if (metas.coberturaTestesPercentual !== undefined) METRIC_TARGETS.coberturaTestesPercentual.value = metas.coberturaTestesPercentual;
         if (metas.leadTimeTestes !== undefined) METRIC_TARGETS.leadTimeTestes.value = metas.leadTimeTestes;
         if (metas.leadTimeBugs !== undefined) METRIC_TARGETS.leadTimeBugs.value = metas.leadTimeBugs;
@@ -262,7 +264,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const s2_cov = getSprintAverageCodeCoverage(monthData.sprint2);
         const averageCoverage = (s1_cov > 0 && s2_cov > 0) ? (s1_cov + s2_cov) / 2 : (s1_cov || s2_cov);
         const passRate = getAverageSprintMetric(monthData, 'passRate');
-        const testCoverage = getMonthTestCoverage(monthData);
+        const testCoverage = getMonthTestCoverage(monthData, METRIC_TARGETS.densidadeTestes.value);
         const totalBugsNonProd = getSprintTotalNonProdBugs(monthData.sprint1) + getSprintTotalNonProdBugs(monthData.sprint2);
         const totalBugsProd = getTotalProductionBugs(monthData);
         const totalBugs = totalBugsNonProd + totalBugsProd;
@@ -832,7 +834,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
         const months = getAvailableMonths();
-        const TARGET = 3; // Meta de CTs por US (pode ser movida para config se desejar)
+        const TARGET = METRIC_TARGETS.densidadeTestes.value;
 
         const avgData = [];
 
@@ -1268,8 +1270,8 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             {
                 name: 'Cobertura de Testes (média)',
-                getCurrentValue: () => getMonthTestCoverage(currentMonthData),
-                getPreviousValue: () => getMonthTestCoverage(previousMonthData),
+                getCurrentValue: () => getMonthTestCoverage(currentMonthData, METRIC_TARGETS.densidadeTestes.value),
+                getPreviousValue: () => getMonthTestCoverage(previousMonthData, METRIC_TARGETS.densidadeTestes.value),
                 format: value => value.toFixed(1) + '%',
                 isPositiveIncrease: true,
                 target: METRIC_TARGETS.coberturaTestesPercentual.value

@@ -4,12 +4,11 @@
 
 /**
  * Calcula a porcentagem de cobertura de testes com base no número de User Stories e Execuções.
- * Meta: 4 casos de teste por User Story.
+ * Meta: Configurável (padrão 4) casos de teste por User Story.
  */
-function calculateTestCoverage(usCount, executedCount) {
+function calculateTestCoverage(usCount, executedCount, targetDensity = 4) {
     if (!usCount || usCount === 0) return 0;
-    const META_CTS_POR_US = 4;
-    const targetTestCases = usCount * META_CTS_POR_US;
+    const targetTestCases = usCount * targetDensity;
     const coverage = targetTestCases > 0 
         ? Math.round((executedCount / targetTestCases) * 100)
         : 0;
@@ -19,7 +18,7 @@ function calculateTestCoverage(usCount, executedCount) {
 /**
  * Calcula a cobertura de testes consolidada do mês (Execução vs Meta).
  */
-function getMonthTestCoverage(centerData) {
+function getMonthTestCoverage(centerData, targetDensity = 4) {
     if (!centerData) return 0;
     const s1 = centerData.sprint1 || {};
     const s2 = centerData.sprint2 || {};
@@ -37,7 +36,7 @@ function getMonthTestCoverage(centerData) {
     };
 
     const totalExecuted = getExec(s1) + getExec(s2);
-    return calculateTestCoverage(totalUS, totalExecuted);
+    return calculateTestCoverage(totalUS, totalExecuted, targetDensity);
 }
 
 /**

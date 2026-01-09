@@ -797,6 +797,7 @@
             const defaultMetas = {
                 coberturaCodigo: { linhas: 50, classes: 50, metodos: 50, branches: 50, geral: 50 },
                 passRate: 90,
+                densidadeTestes: 4,
                 coberturaTestesPercentual: 100,
                 leadTimeTestes: 2.5,
                 leadTimeBugs: 2.0,
@@ -840,6 +841,7 @@
                 // Qualidade Geral
                 html += group('Métricas Gerais', 
                     input('passRate', 'Pass Rate (%)', metas.passRate ?? 90) +
+                    input('densidadeTestes', 'Densidade de Testes (CTs/US)', metas.densidadeTestes ?? 4) +
                     input('coberturaTestesPercentual', 'Cob. Testes (%)', metas.coberturaTestesPercentual ?? 100) +
                     input('leadTimeTestes', 'Lead Time Testes (dias)', metas.leadTimeTestes ?? 2.5, 0.1) +
                     input('leadTimeBugs', 'Lead Time Bugs (dias)', metas.leadTimeBugs ?? 2.0, 0.1) +

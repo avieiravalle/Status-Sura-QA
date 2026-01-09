@@ -14,6 +14,7 @@ const METRIC_TARGETS = {
         branches: { value: 50, higherIsBetter: true }
     },
     passRate: { value: 90, higherIsBetter: true },
+    densidadeTestes: { value: 4, higherIsBetter: true },
     coberturaTestesPercentual: { value: 100, higherIsBetter: true },
     leadTimeTestes: { value: 2.5, higherIsBetter: false },
     leadTimeBugs: { value: 2.0, higherIsBetter: false },
@@ -69,6 +70,7 @@ function updateMetricTargets() {
         setVal(METRIC_TARGETS.coberturaCodigo, 'branches', metas.coberturaCodigo.branches);
     }
     if (metas.passRate !== undefined) METRIC_TARGETS.passRate.value = metas.passRate;
+    if (metas.densidadeTestes !== undefined) METRIC_TARGETS.densidadeTestes.value = metas.densidadeTestes;
     if (metas.coberturaTestesPercentual !== undefined) METRIC_TARGETS.coberturaTestesPercentual.value = metas.coberturaTestesPercentual;
     if (metas.leadTimeTestes !== undefined) METRIC_TARGETS.leadTimeTestes.value = metas.leadTimeTestes;
     if (metas.leadTimeBugs !== undefined) METRIC_TARGETS.leadTimeBugs.value = metas.leadTimeBugs;
@@ -327,8 +329,8 @@ function generateSprintHTML(sprintData, cumulativeScenarios = null, previousIds 
         passRateCalc = totalExecuted > 0 ? Math.min(100, Number(((totalPassed / totalExecuted) * 100).toFixed(1))) : 0;
     }
 
-    // Novo cálculo: Densidade de Testes (Meta: 4 CTs por US)
-    const META_CTS_POR_US = 4;
+    // Novo cálculo: Densidade de Testes (Meta configurável)
+    const META_CTS_POR_US = METRIC_TARGETS.densidadeTestes.value;
     const totalEsperadoCts = sprintData.usSprint * META_CTS_POR_US;
 
     // Cálculos de métricas
@@ -541,7 +543,7 @@ function updateSummary() {
             }
         },
         { name: 'Pass Rate', unit: '%', getValue: (s1, s2) => (s1.passRate + s2.passRate) / 2, getStatus: (v) => v >= METRIC_TARGETS.passRate.value ? 'positive' : v >= (METRIC_TARGETS.passRate.value - 5) ? 'neutral' : 'negative' },
-        { name: 'Cobertura de Testes', unit: '%', getValue: (s1, s2, centerData) => getMonthTestCoverage(centerData), getStatus: (v) => v >= METRIC_TARGETS.coberturaTestesPercentual.value ? 'positive' : v >= (METRIC_TARGETS.coberturaTestesPercentual.value - 10) ? 'neutral' : 'negative' },
+        { name: 'Cobertura de Testes', unit: '%', getValue: (s1, s2, centerData) => getMonthTestCoverage(centerData, METRIC_TARGETS.densidadeTestes.value), getStatus: (v) => v >= METRIC_TARGETS.coberturaTestesPercentual.value ? 'positive' : v >= (METRIC_TARGETS.coberturaTestesPercentual.value - 10) ? 'neutral' : 'negative' },
         { 
             name: 'Bugs (Não Prod.)', unit: '', 
             getValue: (s1, s2) => getSprintTotalNonProdBugs(s1) + getSprintTotalNonProdBugs(s2), 
@@ -709,7 +711,7 @@ function identifyMissedMetrics() {
 
     const totalUS = (sprint1.usSprint || 0) + (sprint2.usSprint || 0);
     const totalTC = (sprint1.casosTestePorUs || 0) + (sprint2.casosTestePorUs || 0);
-    const cobTestes = calculateTestCoverage(totalUS, totalTC);
+    const cobTestes = calculateTestCoverage(totalUS, totalTC, METRIC_TARGETS.densidadeTestes.value);
     check('Cobertura de Testes', cobTestes, METRIC_TARGETS.coberturaTestesPercentual);
 
     check('Lead Time Testes', (sprint1.leadTimeTestes + sprint2.leadTimeTestes) / 2, METRIC_TARGETS.leadTimeTestes);

@@ -309,10 +309,6 @@ function createTable(title, rows) {
 function generateSprintHTML(sprintData, cumulativeScenarios = null, previousIds = new Set()) {
     const fragment = document.createDocumentFragment();
 
-    // Cálculos de métricas
-    const coberturaTestesCalc = calculateTestCoverage(sprintData.usSprint, sprintData.casosTestePorUs);
-    const mediaCtsPorUs = sprintData.usSprint > 0 ? Math.round(sprintData.casosTestePorUs / sprintData.usSprint) : 0;
-
     // Cálculo automático de totais e Pass Rate baseado nas User Stories
     let totalExecuted = sprintData.ctExecutados || 0;
     let totalPassed = sprintData.ctPassados || (sprintData.passRate !== undefined ? Math.round((sprintData.passRate / 100) * totalExecuted) : 0);
@@ -330,6 +326,11 @@ function generateSprintHTML(sprintData, cumulativeScenarios = null, previousIds 
         });
         passRateCalc = totalExecuted > 0 ? Number(((totalPassed / totalExecuted) * 100).toFixed(1)) : 0;
     }
+
+    // Cálculos de métricas
+    // Cobertura Atingida: (Executados / Total Planejado) * 100
+    const coberturaTestesCalc = sprintData.casosTestePorUs > 0 ? Math.round((totalExecuted / sprintData.casosTestePorUs) * 100) : 0;
+    const mediaCtsPorUs = sprintData.usSprint > 0 ? Math.round(sprintData.casosTestePorUs / sprintData.usSprint) : 0;
 
     // Identifica se houve reexecuções (Execuções > Planejado)
     const percentExecuted = sprintData.casosTestePorUs > 0 ? Math.round((totalExecuted / sprintData.casosTestePorUs) * 100) : 0;

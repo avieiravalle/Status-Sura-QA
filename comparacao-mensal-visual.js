@@ -144,7 +144,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Variáveis globais
     let currentCenter;
-    let codeCoverageChart, bugsChart, leadTimeChart, overallHealthChart, reworkChart, automatedTestsChart, bugsSeverityChart, testCasesPerUsChart, qaEfficiencyChart, spilloverChart;
+    let codeCoverageChart, leadTimeChart, overallHealthChart, reworkChart, automatedTestsChart, testCasesPerUsChart, qaEfficiencyChart, spilloverChart, consolidatedBugsChart;
     let currentSort = { column: null, direction: 'asc' };
     let currentTrendMetrics = [];
     
@@ -239,14 +239,13 @@ document.addEventListener('DOMContentLoaded', function() {
         updateOverallHealthChart();
         updateSummaryCards();
         updateCodeCoverageChart();
-        updateBugsChart();
-        updateBugsSeverityChart();
         updateReworkChart();
         updateLeadTimeChart();
         updateAutomatedTestsChart();
         updateTestCasesPerUsChart();
         updateQaEfficiencyChart();
         updateSpilloverChart();
+        updateConsolidatedBugsChart();
         updateTrendAnalysis();
     }
     
@@ -524,216 +523,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Gráfico de bugs
-    function updateBugsChart() {
-        const canvas = document.getElementById('bugs-chart');
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        const months = getAvailableMonths();
-        
-        // Preparar dados para bugs não produtivos e bugs em produção
-        const nonProdBugsData = [];
-        const prodBugsData = [];
-        const monthLabels = [];
-        
-        months.forEach(month => {
-            const centerData = dadosRelatorio[month]?.[currentCenter];
-            if (!centerData) {
-                nonProdBugsData.push(0);
-                prodBugsData.push(0);
-            } else {
-                nonProdBugsData.push(getSprintTotalNonProdBugs(centerData.sprint1) + getSprintTotalNonProdBugs(centerData.sprint2));
-                prodBugsData.push(getTotalProductionBugs(centerData));
-            }
-            monthLabels.push(formatMonth(month));
-        });
-
-        if (bugsChart) {
-            bugsChart.data.labels = monthLabels;
-            bugsChart.data.datasets[0].data = nonProdBugsData;
-            bugsChart.data.datasets[1].data = prodBugsData;
-            bugsChart.update();
-            return;
-        }
-        
-        // Gradients para visual 3D/Moderno
-        const gradientNonProd = ctx.createLinearGradient(0, 0, 0, 400);
-        gradientNonProd.addColorStop(0, 'rgba(52, 152, 219, 1)');
-        gradientNonProd.addColorStop(1, 'rgba(41, 128, 185, 0.8)');
-
-        const gradientProd = ctx.createLinearGradient(0, 0, 0, 400);
-        gradientProd.addColorStop(0, 'rgba(231, 76, 60, 1)');
-        gradientProd.addColorStop(1, 'rgba(192, 57, 43, 0.8)');
-
-        bugsChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: monthLabels,
-                datasets: [
-                    {
-                        label: 'Bugs Não Produtivos',
-                        data: nonProdBugsData,
-                        backgroundColor: gradientNonProd,
-                        borderColor: 'rgba(52, 152, 219, 0)',
-                        borderWidth: 0,
-                        borderRadius: 4,
-                        barPercentage: 0.7,
-                        categoryPercentage: 0.8
-                    },
-                    {
-                        label: 'Bugs em Produção',
-                        data: prodBugsData,
-                        backgroundColor: gradientProd,
-                        borderColor: 'rgba(231, 76, 60, 0)',
-                        borderWidth: 0,
-                        borderRadius: 4,
-                        barPercentage: 0.7,
-                        categoryPercentage: 0.8
-                    }
-                ]
-            },
-            options: {
-                layout: { padding: { top: 20 } },
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        stacked: true,
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: 'Número de Bugs',
-                            font: {
-                                size: 15,
-                                weight: 'bold'
-                            }
-                        },
-                        ticks: {
-                            font: {
-                                size: 13
-                            }
-                        },
-                        grid: { borderDash: [5, 5], color: 'rgba(0,0,0,0.05)' }
-                    },
-                    x: {
-                        stacked: true,
-                        ticks: {
-                            font: { size: 13 }
-                        },
-                        grid: { display: false }
-                    }
-                },
-                plugins: {
-                    title: {
-                        display: true,
-                        text: 'Evolução do Volume de Bugs',
-                        font: { size: 18 }
-                    },
-                    tooltip: {
-                        backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                        titleColor: '#333',
-                        bodyColor: '#333',
-                        borderColor: '#ddd',
-                        borderWidth: 1,
-                        padding: 12,
-                        cornerRadius: 6
-                    },
-                    datalabels: {
-                        color: '#fff',
-                        font: {
-                            weight: 'bold',
-                            size: 13
-                        },
-                        formatter: function(value) {
-                            return value > 0 ? value : '';
-                        }
-                    }
-                }
-            }
-        });
-    }
-    
-    // Gráfico de Bugs por Severidade (Empilhado)
-    function updateBugsSeverityChart() {
-        const canvas = document.getElementById('bugs-severity-chart');
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        const months = getAvailableMonths();
-
-        const lowData = [];
-        const mediumData = [];
-        const highData = [];
-
-        months.forEach(month => {
-            const centerData = dadosRelatorio[month]?.[currentCenter];
-            let low = 0, medium = 0, high = 0;
-
-            if (centerData) {
-                const s1 = centerData.sprint1 || {};
-                const s2 = centerData.sprint2 || {};
-                
-                // Helper para somar bugs de sprints e produção
-                const getCount = (obj, type) => (obj[type] || 0);
-                const s1Bugs = s1.bugsNaoProdutivos || {};
-                const s2Bugs = s2.bugsNaoProdutivos || {};
-                const prodBugs = getProductionBugsObject(centerData);
-
-                low = getCount(s1Bugs, 'baixa') + getCount(s2Bugs, 'baixa') + prodBugs.baixa;
-                medium = getCount(s1Bugs, 'media') + getCount(s2Bugs, 'media') + prodBugs.media;
-                high = getCount(s1Bugs, 'alta') + getCount(s2Bugs, 'alta') + prodBugs.alta;
-            }
-            lowData.push(low);
-            mediumData.push(medium);
-            highData.push(high);
-        });
-
-        if (bugsSeverityChart) {
-            bugsSeverityChart.data.labels = months.map(formatMonth);
-            bugsSeverityChart.data.datasets[0].data = lowData;
-            bugsSeverityChart.data.datasets[1].data = mediumData;
-            bugsSeverityChart.data.datasets[2].data = highData;
-            bugsSeverityChart.update();
-            return;
-        }
-
-        const gradLow = ctx.createLinearGradient(0, 0, 0, 400);
-        gradLow.addColorStop(0, '#2ecc71'); gradLow.addColorStop(1, '#27ae60');
-        
-        const gradMed = ctx.createLinearGradient(0, 0, 0, 400);
-        gradMed.addColorStop(0, '#f1c40f'); gradMed.addColorStop(1, '#f39c12');
-        
-        const gradHigh = ctx.createLinearGradient(0, 0, 0, 400);
-        gradHigh.addColorStop(0, '#e74c3c'); gradHigh.addColorStop(1, '#c0392b');
-
-        bugsSeverityChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: months.map(formatMonth),
-                datasets: [
-                    { label: 'Baixa', data: lowData, backgroundColor: gradLow, borderRadius: 4, stack: 'stack0' },
-                    { label: 'Média', data: mediumData, backgroundColor: gradMed, borderRadius: 4, stack: 'stack0' },
-                    { label: 'Alta', data: highData, backgroundColor: gradHigh, borderRadius: 4, stack: 'stack0' }
-                ]
-            },
-            options: {
-                layout: { padding: { top: 20 } },
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    x: { stacked: true, grid: { display: false } },
-                    y: { stacked: true, beginAtZero: true, title: { display: true, text: 'Quantidade' }, grid: { borderDash: [5, 5], color: 'rgba(0,0,0,0.05)' } }
-                },
-                plugins: {
-                    title: { display: true, text: 'Distribuição de Bugs por Severidade' },
-                    datalabels: {
-                        color: 'white', font: { weight: 'bold', size: 11 },
-                        formatter: (value) => value > 0 ? value : ''
-                    }
-                }
-            }
-        });
-    }
-
     // Gráfico de lead time
     function updateLeadTimeChart() {
         const canvas = document.getElementById('leadtime-chart');
@@ -1311,6 +1100,104 @@ document.addEventListener('DOMContentLoaded', function() {
                         formatter: (value) => value > 0 ? value : ''
                     },
                     legend: { display: true, position: 'bottom' }
+                }
+            }
+        });
+    }
+
+    // Gráfico Consolidado de Bugs (Volume e Criticidade)
+    function updateConsolidatedBugsChart() {
+        // 1. Ocultar gráficos antigos se existirem
+        ['bugs-chart', 'bugs-severity-chart'].forEach(id => {
+            const oldCanvas = document.getElementById(id);
+            if (oldCanvas) {
+                const container = oldCanvas.closest('.chart-container') || oldCanvas.parentElement;
+                if (container) container.style.display = 'none';
+            }
+        });
+
+        // 2. Criar ou obter o novo gráfico
+        let canvas = document.getElementById('consolidated-bugs-chart');
+        if (!canvas) {
+            const chartsSection = document.querySelector('.charts-section');
+            if (chartsSection) {
+                const container = document.createElement('div');
+                container.className = 'chart-container';
+                container.style.backgroundColor = '#fff';
+                container.style.borderRadius = '8px';
+                container.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+                container.style.padding = '15px';
+                container.style.margin = '10px';
+                container.style.minHeight = '300px';
+                container.style.flex = '1 1 45%';
+
+                canvas = document.createElement('canvas');
+                canvas.id = 'consolidated-bugs-chart';
+                
+                container.appendChild(canvas);
+                chartsSection.appendChild(container);
+            } else {
+                return;
+            }
+        }
+
+        const ctx = canvas.getContext('2d');
+        const months = getAvailableMonths();
+
+        const lowData = [];
+        const mediumData = [];
+        const highData = [];
+
+        months.forEach(month => {
+            const centerData = dadosRelatorio[month]?.[currentCenter];
+            let low = 0, medium = 0, high = 0;
+
+            if (centerData) {
+                const prodBugs = getProductionBugsObject(centerData);
+
+                low = prodBugs.baixa;
+                medium = prodBugs.media;
+                high = prodBugs.alta;
+            }
+            lowData.push(low);
+            mediumData.push(medium);
+            highData.push(high);
+        });
+
+        if (consolidatedBugsChart) {
+            consolidatedBugsChart.data.labels = months.map(formatMonth);
+            consolidatedBugsChart.data.datasets[0].data = lowData;
+            consolidatedBugsChart.data.datasets[1].data = mediumData;
+            consolidatedBugsChart.data.datasets[2].data = highData;
+            consolidatedBugsChart.update();
+            return;
+        }
+
+        const gradLow = ctx.createLinearGradient(0, 0, 0, 400); gradLow.addColorStop(0, '#2ecc71'); gradLow.addColorStop(1, '#27ae60');
+        const gradMed = ctx.createLinearGradient(0, 0, 0, 400); gradMed.addColorStop(0, '#f1c40f'); gradMed.addColorStop(1, '#f39c12');
+        const gradHigh = ctx.createLinearGradient(0, 0, 0, 400); gradHigh.addColorStop(0, '#e74c3c'); gradHigh.addColorStop(1, '#c0392b');
+
+        consolidatedBugsChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: months.map(formatMonth),
+                datasets: [
+                    { label: 'Baixa', data: lowData, backgroundColor: gradLow, borderRadius: 4, stack: 'stack0' },
+                    { label: 'Média', data: mediumData, backgroundColor: gradMed, borderRadius: 4, stack: 'stack0' },
+                    { label: 'Alta', data: highData, backgroundColor: gradHigh, borderRadius: 4, stack: 'stack0' }
+                ]
+            },
+            options: {
+                layout: { padding: { top: 20 } },
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { stacked: true, grid: { display: false } },
+                    y: { stacked: true, beginAtZero: true, title: { display: true, text: 'Volume Total' }, grid: { borderDash: [5, 5], color: 'rgba(0,0,0,0.05)' } }
+                },
+                plugins: {
+                    title: { display: true, text: 'Evolução de Volume e Criticidade de Bugs (Produção)' },
+                    datalabels: { color: 'white', font: { weight: 'bold', size: 11 }, formatter: (value) => value > 0 ? value : '' }
                 }
             }
         });

@@ -3,28 +3,41 @@
  */
 
 /**
- * Calcula a porcentagem de cobertura de testes com base no número de User Stories e Casos de Teste.
- * Meta: 3 casos de teste por User Story.
+ * Calcula a porcentagem de cobertura de testes com base no número de User Stories e Execuções.
+ * Meta: 4 casos de teste por User Story.
  */
-function calculateTestCoverage(usCount, testCaseCount) {
+function calculateTestCoverage(usCount, executedCount) {
     if (!usCount || usCount === 0) return 0;
-    const targetTestCases = usCount * 3;
+    const META_CTS_POR_US = 4;
+    const targetTestCases = usCount * META_CTS_POR_US;
     const coverage = targetTestCases > 0 
-        ? Math.round((testCaseCount / targetTestCases) * 100)
+        ? Math.round((executedCount / targetTestCases) * 100)
         : 0;
     return Math.min(100, coverage);
 }
 
 /**
- * Calcula a cobertura de testes consolidada do mês (soma de US e CTs das sprints).
+ * Calcula a cobertura de testes consolidada do mês (Execução vs Meta).
  */
 function getMonthTestCoverage(centerData) {
     if (!centerData) return 0;
     const s1 = centerData.sprint1 || {};
     const s2 = centerData.sprint2 || {};
     const totalUS = (s1.usSprint || 0) + (s2.usSprint || 0);
-    const totalCasosTeste = (s1.casosTestePorUs || 0) + (s2.casosTestePorUs || 0);
-    return calculateTestCoverage(totalUS, totalCasosTeste);
+    
+    const getExec = (s) => {
+        if (s.listaUserStories && s.listaUserStories.length > 0) {
+            return s.listaUserStories.reduce((acc, us) => {
+                const passed = (us.passed !== undefined && us.passed !== null && us.passed !== '') ? Number(us.passed) : 0;
+                const failed = (us.failed !== undefined && us.failed !== null && us.failed !== '') ? Number(us.failed) : 0;
+                return acc + passed + failed;
+            }, 0);
+        }
+        return s.ctExecutados || 0;
+    };
+
+    const totalExecuted = getExec(s1) + getExec(s2);
+    return calculateTestCoverage(totalUS, totalExecuted);
 }
 
 /**

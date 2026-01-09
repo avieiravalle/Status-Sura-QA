@@ -324,13 +324,20 @@ function generateSprintHTML(sprintData, cumulativeScenarios = null, previousIds 
             totalExecuted += executed;
             totalPassed += passed;
         });
-        passRateCalc = totalExecuted > 0 ? Number(((totalPassed / totalExecuted) * 100).toFixed(1)) : 0;
+        passRateCalc = totalExecuted > 0 ? Math.min(100, Number(((totalPassed / totalExecuted) * 100).toFixed(1))) : 0;
     }
 
+    // Novo cálculo: Densidade de Testes (Meta: 4 CTs por US)
+    const META_CTS_POR_US = 4;
+    const totalEsperadoCts = sprintData.usSprint * META_CTS_POR_US;
+
     // Cálculos de métricas
-    // Cobertura Atingida: (Executados / Total Planejado) * 100
-    const coberturaTestesCalc = sprintData.casosTestePorUs > 0 ? Math.round((totalExecuted / sprintData.casosTestePorUs) * 100) : 0;
+    // Cobertura Atingida: (Executados / Total Ideal Baseado na Meta) * 100
+    const coberturaTestesCalc = totalEsperadoCts > 0 ? Math.min(100, Math.round((totalExecuted / totalEsperadoCts) * 100)) : 0;
     const mediaCtsPorUs = sprintData.usSprint > 0 ? Math.round(sprintData.casosTestePorUs / sprintData.usSprint) : 0;
+
+    const percentDensity = totalEsperadoCts > 0 ? Math.min(100, (sprintData.casosTestePorUs / totalEsperadoCts) * 100) : (sprintData.casosTestePorUs > 0 ? 100 : 0);
+    const densityDisplay = `${percentDensity.toFixed(1)}% (${sprintData.casosTestePorUs}/${totalEsperadoCts})`;
 
     // Identifica se houve reexecuções (Execuções > Planejado)
     const percentExecuted = sprintData.casosTestePorUs > 0 ? Math.round((totalExecuted / sprintData.casosTestePorUs) * 100) : 0;
@@ -347,9 +354,9 @@ function generateSprintHTML(sprintData, cumulativeScenarios = null, previousIds 
 
     fragment.appendChild(createTable('Cobertura de Testes (Funcional)', [
         createMetricRow('User Stories (US)', sprintData.usSprint, '', { value: `1 US / ${mediaCtsPorUs} CTs`, evaluate: false }),
-        createMetricRow('Casos de Teste Criados', percentExecuted, '%', { value: 90, higherIsBetter: true, customDisplay: `${percentExecuted}% (${totalExecuted}/${sprintData.casosTestePorUs})` }),
+        createMetricRow('Densidade de Testes (Criados)', percentDensity, '%', { value: 100, higherIsBetter: true, customDisplay: densityDisplay }),
         createMetricRow('Execuções Totais', totalExecuted, '', { value: totalExecuted, evaluate: false, customDisplay: execDisplay }),
-        createMetricRow('Cobertura Atingida', coberturaTestesCalc, '%', METRIC_TARGETS.coberturaTestesPercentual),
+        createMetricRow('Cobertura Atingida', coberturaTestesCalc, '%', { value: 90, higherIsBetter: true }),
         createMetricRow('Pass Rate', passRateCalc, '%', { ...METRIC_TARGETS.passRate, customDisplay: `${passRateCalc}% (${totalPassed}/${totalExecuted})` })
     ]));
 
@@ -534,11 +541,7 @@ function updateSummary() {
             }
         },
         { name: 'Pass Rate', unit: '%', getValue: (s1, s2) => (s1.passRate + s2.passRate) / 2, getStatus: (v) => v >= METRIC_TARGETS.passRate.value ? 'positive' : v >= (METRIC_TARGETS.passRate.value - 5) ? 'neutral' : 'negative' },
-        { name: 'Cobertura de Testes', unit: '%', getValue: (s1, s2) => {
-            const totalUS = (s1.usSprint || 0) + (s2.usSprint || 0);
-            const totalCasosTeste = (s1.casosTestePorUs || 0) + (s2.casosTestePorUs || 0);
-            return calculateTestCoverage(totalUS, totalCasosTeste);
-        }, getStatus: (v) => v >= METRIC_TARGETS.coberturaTestesPercentual.value ? 'positive' : v >= (METRIC_TARGETS.coberturaTestesPercentual.value - 10) ? 'neutral' : 'negative' },
+        { name: 'Cobertura de Testes', unit: '%', getValue: (s1, s2, centerData) => getMonthTestCoverage(centerData), getStatus: (v) => v >= METRIC_TARGETS.coberturaTestesPercentual.value ? 'positive' : v >= (METRIC_TARGETS.coberturaTestesPercentual.value - 10) ? 'neutral' : 'negative' },
         { 
             name: 'Bugs (Não Prod.)', unit: '', 
             getValue: (s1, s2) => getSprintTotalNonProdBugs(s1) + getSprintTotalNonProdBugs(s2), 

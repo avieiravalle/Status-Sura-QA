@@ -485,8 +485,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 maintainAspectRatio: false,
                 scales: {
                     y: {
-                        beginAtZero: false,
-                        suggestedMin: 50,
+                        beginAtZero: true,
                         max: 100,
                         title: {
                             display: true,

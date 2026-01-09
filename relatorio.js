@@ -252,7 +252,7 @@ function createMetricRow(label, value, unit, targetConfig) {
     valueCell.textContent = `${value.toLocaleString('pt-BR')}${unit}`;
  
     // A cor do valor é definida pelo atingimento da meta.
-    if (targetConfig) {
+    if (targetConfig && targetConfig.evaluate !== false) {
         const isMet = targetConfig.higherIsBetter ? value >= targetConfig.value : value <= targetConfig.value;
         valueCell.className = isMet ? 'positive' : 'negative';
     }
@@ -302,6 +302,7 @@ function generateSprintHTML(sprintData, cumulativeScenarios = null) {
 
     // Cálculos de métricas
     const coberturaTestesCalc = calculateTestCoverage(sprintData.usSprint, sprintData.casosTestePorUs);
+    const mediaCtsPorUs = sprintData.usSprint > 0 ? Math.round(sprintData.casosTestePorUs / sprintData.usSprint) : 0;
 
     fragment.appendChild(createTable('Cobertura de Código', [
         createMetricRow('Linhas', sprintData.coberturaCodigo.linhas, '%', METRIC_TARGETS.coberturaCodigo.linhas),
@@ -311,7 +312,7 @@ function generateSprintHTML(sprintData, cumulativeScenarios = null) {
     ]));
 
     fragment.appendChild(createTable('Cobertura de Testes (Funcional)', [
-        createMetricRow('User Stories (US)', sprintData.usSprint, '', null),
+        createMetricRow('User Stories (US)', sprintData.usSprint, '', { value: `1 US / ${mediaCtsPorUs} CTs`, evaluate: false }),
         createMetricRow('Casos de Teste Criados', sprintData.casosTestePorUs, '', null),
         createMetricRow('Cobertura Atingida', coberturaTestesCalc, '%', METRIC_TARGETS.coberturaTestesPercentual),
         createMetricRow('Pass Rate', sprintData.passRate, '%', METRIC_TARGETS.passRate)

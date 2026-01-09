@@ -22,6 +22,14 @@
         .us-table th { background-color: #f8f9fa; color: var(--primary-color); }
         .btn-icon { cursor: pointer; border: none; background: none; font-size: 1.1em; }
 
+        /* Remove os botões de incremento/decremento (spinners) dos inputs numéricos na tabela */
+        .us-table input[type=number]::-webkit-inner-spin-button, 
+        .us-table input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+        .us-table input[type=number] { -moz-appearance: textfield; }
+
         * {
             box-sizing: border-box;
             margin: 0;
@@ -515,7 +523,7 @@
                                 ${generateInput(sprintKey, 'coberturaCodigo.branches', data.coberturaCodigo.branches, 'Branches', 'max="100"')}
                             </div>
                         </div>
-                        ${generateInput(sprintKey, 'passRate', data.passRate, 'Pass Rate (%)', 'max="100"')}
+                        ${generateInput(sprintKey, 'passRate', data.passRate, 'Pass Rate (%)', 'readonly tabindex="-1" style="background-color: #f9f9f9;"')}
                         <div class="input-group">
                             <label>Bugs Não Produtivos</label>
                             <div class="sub-group">
@@ -528,7 +536,7 @@
                         ${generateUserStoriesSection(sprintKey, data)}
                         
                         ${generateInput(sprintKey, 'leadTimeTestes', data.leadTimeTestes, 'Lead Time de Testes (dias)')}
-                        <!-- O campo coberturaTestesPercentual foi removido pois agora é calculado dinamicamente -->
+                        ${generateInput(sprintKey, 'coberturaTestesPercentual', data.coberturaTestesPercentual || 0, 'Cobertura de Testes (%)', 'readonly tabindex="-1" style="background-color: #f9f9f9;"')}
                         ${generateInput(sprintKey, 'leadTimeBugs', data.leadTimeBugs, 'Lead Time de Bugs (dias)')}
                         ${generateInput(sprintKey, 'leadTimeBugsProd', data.leadTimeBugsProd || 0, 'Lead Time de Bugs Prod (dias)')}
                         <div class="input-group">
@@ -563,12 +571,18 @@
                 let rowsHtml = '';
                 
                 stories.forEach((story, index) => {
+                    const passed = story.passed || 0;
+                    // Garante compatibilidade com dados antigos onde 'failed' pode não existir
+                    const failed = (story.failed !== undefined) ? story.failed : ((story.executed || 0) - passed);
+                    const executed = passed + failed;
+
                     rowsHtml += `
                         <tr class="us-row">
                             <td><input type="text" class="us-name" value="${story.nome || ''}" placeholder="Ex: US-123 Login"></td>
                             <td><input type="number" class="us-cts" value="${story.cts || 0}" min="0" placeholder="Total" oninput="window.updateUsTotals('${sprintKey}')"></td>
-                            <td><input type="number" class="us-exec" value="${story.executed || 0}" min="0" placeholder="Exec." oninput="window.updateUsTotals('${sprintKey}')"></td>
-                            <td><input type="number" class="us-pass" value="${story.passed || 0}" min="0" placeholder="Pass." oninput="window.updateUsTotals('${sprintKey}')"></td>
+                            <td><input type="number" class="us-exec" value="${executed}" min="0" placeholder="Exec" readonly tabindex="-1" style="background-color: #f9f9f9;"></td>
+                            <td><input type="number" class="us-pass" value="${passed}" min="0" placeholder="Pass" oninput="window.updateUsTotals('${sprintKey}')"></td>
+                            <td><input type="number" class="us-fail" value="${failed}" min="0" placeholder="Fail" oninput="window.updateUsTotals('${sprintKey}')" style="color: #e74c3c; font-weight: bold;"></td>
                             <td style="text-align: center;"><button type="button" class="btn-icon" style="color: #e74c3c;" onclick="window.removeUsRow(this, '${sprintKey}')" title="Remover">🗑️</button></td>
                         </tr>
                     `;
@@ -582,8 +596,9 @@
                                 <tr>
                                     <th>História (ID/Nome)</th>
                                     <th style="width: 80px;">Total</th>
-                                    <th style="width: 80px;">Exec.</th>
-                                    <th style="width: 80px;">Pass.</th>
+                                    <th style="width: 80px;">Exec</th>
+                                    <th style="width: 80px;">Pass</th>
+                                    <th style="width: 80px;">Fail</th>
                                     <th style="width: 50px;">Ação</th>
                                 </tr>
                             </thead>
@@ -602,10 +617,12 @@
             function generateInput(sprintKey, fieldPath, value, label, attributes = '') {
                 const idPath = fieldPath.replace(/\./g, '-');
                 const safeId = sprintKey === 'productData' ? idPath : `${sprintKey}-${idPath}`;
+                // Garante que 0 seja exibido como "0" e não vazio
+                const safeValue = (value !== undefined && value !== null) ? value : '';
                 return `
                     <div class="input-group">
                         <label for="${safeId}">${label}</label>
-                        <input type="number" id="${safeId}" data-field="${fieldPath}" value="${value}" step="0.1" ${attributes}>
+                        <input type="number" id="${safeId}" data-field="${fieldPath}" value="${safeValue}" step="0.1" ${attributes}>
                     </div>
                 `;
             }
@@ -653,7 +670,8 @@
                             nome: row.querySelector('.us-name').value,
                             cts: parseInt(row.querySelector('.us-cts').value) || 0,
                             executed: parseInt(row.querySelector('.us-exec').value) || 0,
-                            passed: parseInt(row.querySelector('.us-pass').value) || 0
+                            passed: parseInt(row.querySelector('.us-pass').value) || 0,
+                            failed: parseInt(row.querySelector('.us-fail').value) || 0
                         });
                     });
                     productData[sprintKey].listaUserStories = listaUserStories;
@@ -973,8 +991,9 @@
             tr.innerHTML = `
                 <td><input type="text" class="us-name" placeholder="Ex: US-123 Nova Funcionalidade"></td>
                 <td><input type="number" class="us-cts" value="0" min="0" placeholder="Total" oninput="window.updateUsTotals('${sprintKey}')"></td>
-                <td><input type="number" class="us-exec" value="0" min="0" placeholder="Exec." oninput="window.updateUsTotals('${sprintKey}')"></td>
-                <td><input type="number" class="us-pass" value="0" min="0" placeholder="Pass." oninput="window.updateUsTotals('${sprintKey}')"></td>
+                <td><input type="number" class="us-exec" value="0" min="0" placeholder="Exec" readonly tabindex="-1" style="background-color: #f9f9f9;"></td>
+                <td><input type="number" class="us-pass" value="0" min="0" placeholder="Pass" oninput="window.updateUsTotals('${sprintKey}')"></td>
+                <td><input type="number" class="us-fail" value="0" min="0" placeholder="Fail" oninput="window.updateUsTotals('${sprintKey}')" style="color: #e74c3c; font-weight: bold;"></td>
                 <td style="text-align: center;"><button type="button" class="btn-icon" style="color: #e74c3c;" onclick="window.removeUsRow(this, '${sprintKey}')" title="Remover">🗑️</button></td>
             `;
             tbody.appendChild(tr);
@@ -996,19 +1015,39 @@
             rows.forEach(row => {
                 totalUS++;
                 totalCTs += parseInt(row.querySelector('.us-cts').value) || 0;
-                totalExec += parseInt(row.querySelector('.us-exec').value) || 0;
-                totalPass += parseInt(row.querySelector('.us-pass').value) || 0;
+                const pass = parseInt(row.querySelector('.us-pass').value) || 0;
+                const fail = parseInt(row.querySelector('.us-fail').value) || 0;
+                const exec = pass + fail;
+                
+                const execInput = row.querySelector('.us-exec');
+                if (execInput) execInput.value = exec;
+                
+                totalExec += exec;
+                totalPass += pass;
             });
 
             if (document.getElementById(`${sprintKey}-usSprint`)) document.getElementById(`${sprintKey}-usSprint`).value = totalUS;
             if (document.getElementById(`${sprintKey}-casosTestePorUs`)) document.getElementById(`${sprintKey}-casosTestePorUs`).value = totalCTs;
 
             // Cálculo automático do Pass Rate
+            const passRateInput = document.getElementById(`${sprintKey}-passRate`);
             if (totalExec > 0) {
                 const passRate = (totalPass / totalExec) * 100;
-                // Atualiza o campo Pass Rate da sprint (limitado a 2 casas decimais)
-                const passRateInput = document.getElementById(`${sprintKey}-passRate`);
                 if (passRateInput) passRateInput.value = parseFloat(passRate.toFixed(2));
+            } else {
+                if (passRateInput) passRateInput.value = 0;
+            }
+
+            // Cálculo automático da Cobertura de Testes (Funcional)
+            const cobTestesInput = document.getElementById(`${sprintKey}-coberturaTestesPercentual`);
+            if (cobTestesInput) {
+                if (totalUS > 0) {
+                    // Fórmula: (Total CTs / (Total US * 3)) * 100
+                    const cob = (totalCTs / (totalUS * 3)) * 100;
+                    cobTestesInput.value = parseFloat(cob.toFixed(2));
+                } else {
+                    cobTestesInput.value = 0;
+                }
             }
         };
     </script>

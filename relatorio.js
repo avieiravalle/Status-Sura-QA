@@ -324,8 +324,9 @@ function generateSprintHTML(sprintData, cumulativeScenarios = null) {
         headerRow.innerHTML = `
             <th style="background-color: #f9f9f9; font-size: 0.9em;">História</th>
             <th style="background-color: #f9f9f9; font-size: 0.9em;">Total CTs</th>
-            <th style="background-color: #f9f9f9; font-size: 0.9em;">Executados</th>
-            <th style="background-color: #f9f9f9; font-size: 0.9em;">Passados</th>
+            <th style="background-color: #f9f9f9; font-size: 0.9em;">Exec</th>
+            <th style="background-color: #f9f9f9; font-size: 0.9em;">Pass</th>
+            <th style="background-color: #f9f9f9; font-size: 0.9em;">Fail</th>
         `;
 
         const usRows = sprintData.listaUserStories.map(us => {
@@ -336,12 +337,14 @@ function generateSprintHTML(sprintData, cumulativeScenarios = null) {
             const executed = us.executed || 0;
             const passed = us.passed || 0;
             const passedClass = passed < executed ? 'negative' : '';
+            const failed = (us.failed !== undefined) ? us.failed : (executed - passed);
 
             row.innerHTML = `
                 <td style="padding-left: 20px; color: #555;">• ${us.nome || 'Sem nome'}</td>
                 <td class="${ctsClass}">${cts}</td>
                 <td>${executed}</td>
                 <td class="${passedClass}">${passed}</td>
+                <td style="color: #e74c3c; font-weight: bold;">${failed}</td>
             `;
             return row;
         });
@@ -356,7 +359,7 @@ function generateSprintHTML(sprintData, cumulativeScenarios = null) {
             thead.innerHTML = ''; 
             const titleRow = document.createElement('tr');
             const titleCell = document.createElement('th');
-            titleCell.colSpan = 4;
+            titleCell.colSpan = 5;
             titleCell.textContent = 'Detalhamento por História';
             titleRow.appendChild(titleCell);
             thead.appendChild(titleRow);

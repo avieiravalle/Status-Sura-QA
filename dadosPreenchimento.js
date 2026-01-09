@@ -16,7 +16,7 @@ const dadosRelatorio = {
           "media": 0,
           "alta": 0
         },
-        "coberturaTestesPercentual": 92,
+        "coberturaTestesPercentual": 133.33,
         "leadTimeTestes": 4,
         "leadTimeBugs": 0,
         "usSprint": 2,
@@ -30,7 +30,28 @@ const dadosRelatorio = {
         "ctExecutados": 54,
         "reexecucaoBugsNaoProd": 0,
         "reexecucaoBugsProd": 0,
-        "leadTimeBugsProd": 0
+        "leadTimeBugsProd": 0,
+        "listaUserStories": [
+          {
+            "nome": "38080",
+            "cts": 6,
+            "executed": 7,
+            "passed": 7,
+            "failed": 0
+          },
+          {
+            "nome": "35699",
+            "cts": 2,
+            "executed": 2,
+            "passed": 2,
+            "failed": 0
+          }
+        ],
+        "eficiencia": {
+          "escrita": 0,
+          "execucao": 0,
+          "reexecucao": 0
+        }
       },
       "sprint2": {
         "numero": "02",
@@ -41,13 +62,13 @@ const dadosRelatorio = {
           "metodos": 53,
           "branches": 18
         },
-        "passRate": 95,
+        "passRate": 100,
         "bugsNaoProdutivos": {
           "baixa": 4,
           "media": 0,
           "alta": 0
         },
-        "coberturaTestesPercentual": 94,
+        "coberturaTestesPercentual": 213.33,
         "leadTimeTestes": 4,
         "leadTimeBugs": 0,
         "usSprint": 5,
@@ -61,7 +82,49 @@ const dadosRelatorio = {
         "ctExecutados": 68,
         "reexecucaoBugsNaoProd": 0,
         "reexecucaoBugsProd": 0,
-        "leadTimeBugsProd": 0
+        "leadTimeBugsProd": 0,
+        "listaUserStories": [
+          {
+            "nome": "38386",
+            "cts": 3,
+            "executed": 2,
+            "passed": 2,
+            "failed": 0
+          },
+          {
+            "nome": "38446",
+            "cts": 5,
+            "executed": 5,
+            "passed": 5,
+            "failed": 0
+          },
+          {
+            "nome": "30960",
+            "cts": 9,
+            "executed": 0,
+            "passed": 0,
+            "failed": 0
+          },
+          {
+            "nome": "38281",
+            "cts": 11,
+            "executed": 11,
+            "passed": 11,
+            "failed": 0
+          },
+          {
+            "nome": "38452",
+            "cts": 4,
+            "executed": 4,
+            "passed": 4,
+            "failed": 0
+          }
+        ],
+        "eficiencia": {
+          "escrita": 0,
+          "execucao": 0,
+          "reexecucao": 0
+        }
       },
       "bugsProducao": {
         "baixa": 0,
@@ -362,17 +425,17 @@ const dadosRelatorio = {
           "metodos": 32,
           "branches": 15
         },
-        "passRate": 60,
+        "passRate": 100,
         "bugsNaoProdutivos": {
           "baixa": 2,
           "media": 0,
           "alta": 0
         },
-        "coberturaTestesPercentual": 95,
+        "coberturaTestesPercentual": 213.33,
         "leadTimeTestes": 4,
         "leadTimeBugs": 1,
-        "usSprint": 3,
-        "casosTestePorUs": 12,
+        "usSprint": 5,
+        "casosTestePorUs": 32,
         "testesAutomatizados": {
           "cenarios": 0,
           "tempoManual": 360,
@@ -385,24 +448,46 @@ const dadosRelatorio = {
         "leadTimeBugsProd": 0,
         "listaUserStories": [
           {
-            "nome": "0001",
-            "cts": 2,
+            "nome": "38386",
+            "cts": 3,
             "executed": 2,
-            "passed": 1
+            "passed": 2,
+            "failed": 0
           },
           {
-            "nome": "0002",
-            "cts": 5,
-            "executed": 3,
-            "passed": 1
-          },
-          {
-            "nome": "0003",
+            "nome": "38446",
             "cts": 5,
             "executed": 5,
-            "passed": 4
+            "passed": 5,
+            "failed": 0
+          },
+          {
+            "nome": "30960",
+            "cts": 9,
+            "executed": 0,
+            "passed": 0,
+            "failed": 0
+          },
+          {
+            "nome": "38281",
+            "cts": 11,
+            "executed": 11,
+            "passed": 11,
+            "failed": 0
+          },
+          {
+            "nome": "38452",
+            "cts": 4,
+            "executed": 4,
+            "passed": 4,
+            "failed": 0
           }
-        ]
+        ],
+        "eficiencia": {
+          "escrita": 0,
+          "execucao": 0,
+          "reexecucao": 0
+        }
       },
       "sprint2": {
         "numero": "02",
@@ -413,17 +498,17 @@ const dadosRelatorio = {
           "metodos": 0,
           "branches": 0
         },
-        "passRate": 0,
+        "passRate": 100,
         "bugsNaoProdutivos": {
           "baixa": 0,
           "media": 0,
           "alta": 0
         },
-        "coberturaTestesPercentual": 96,
+        "coberturaTestesPercentual": 200,
         "leadTimeTestes": 4,
         "leadTimeBugs": 0,
-        "usSprint": 0,
-        "casosTestePorUs": 0,
+        "usSprint": 3,
+        "casosTestePorUs": 18,
         "testesAutomatizados": {
           "cenarios": 0,
           "tempoManual": 360,
@@ -434,7 +519,34 @@ const dadosRelatorio = {
         "reexecucaoBugsNaoProd": 0,
         "reexecucaoBugsProd": 0,
         "leadTimeBugsProd": 0,
-        "listaUserStories": []
+        "listaUserStories": [
+          {
+            "nome": "37735",
+            "cts": 4,
+            "executed": 4,
+            "passed": 4,
+            "failed": 0
+          },
+          {
+            "nome": "39869",
+            "cts": 6,
+            "executed": 6,
+            "passed": 6,
+            "failed": 0
+          },
+          {
+            "nome": "30954",
+            "cts": 8,
+            "executed": 4,
+            "passed": 4,
+            "failed": 0
+          }
+        ],
+        "eficiencia": {
+          "escrita": 0,
+          "execucao": 0,
+          "reexecucao": 0
+        }
       },
       "bugsProducao": {
         "baixa": 0,

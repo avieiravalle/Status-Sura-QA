@@ -119,14 +119,28 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Configurações globais para um visual mais "executivo"
     Chart.defaults.font.family = "'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', sans-serif";
-    Chart.defaults.font.size = 13; // Aumentado o tamanho base da fonte
+    Chart.defaults.font.size = 12;
+    Chart.defaults.color = '#555';
+    
     Chart.defaults.plugins.title.font.weight = 'bold';
-    Chart.defaults.plugins.title.font.size = 18; // Títulos maiores por padrão
-    Chart.defaults.plugins.title.color = '#333';
+    Chart.defaults.plugins.title.font.size = 16;
+    Chart.defaults.plugins.title.color = '#1a1a1a';
+    Chart.defaults.plugins.title.padding = 15;
+
     Chart.defaults.plugins.legend.labels.usePointStyle = true;
-    Chart.defaults.plugins.legend.labels.pointStyle = 'circle';
-    Chart.defaults.plugins.legend.position = 'top';
-    Chart.defaults.plugins.legend.labels.font = { size: 13 }; // Legendas mais legíveis
+    Chart.defaults.plugins.legend.labels.pointStyle = 'rectRounded';
+    Chart.defaults.plugins.legend.position = 'bottom';
+    Chart.defaults.plugins.legend.labels.padding = 20;
+    
+    // Tooltips mais modernos
+    Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(255, 255, 255, 0.95)';
+    Chart.defaults.plugins.tooltip.titleColor = '#1a1a1a';
+    Chart.defaults.plugins.tooltip.bodyColor = '#4a4a4a';
+    Chart.defaults.plugins.tooltip.borderColor = 'rgba(0,0,0,0.1)';
+    Chart.defaults.plugins.tooltip.borderWidth = 1;
+    Chart.defaults.plugins.tooltip.padding = 10;
+    Chart.defaults.plugins.tooltip.cornerRadius = 8;
+    Chart.defaults.plugins.tooltip.displayColors = true;
     
     // Variáveis globais
     let currentCenter;
@@ -331,9 +345,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const lastScore100 = healthScores100[healthScores100.length - 1] || 0;
         
         const getColorStops = (score) => {
-            if (score >= 80) return ['rgba(46, 204, 113, 0.6)', 'rgba(46, 204, 113, 0.1)']; // Verde (base 100)
-            if (score >= 60) return ['rgba(243, 156, 18, 0.6)', 'rgba(243, 156, 18, 0.1)']; // Laranja
-            return ['rgba(231, 76, 60, 0.6)', 'rgba(231, 76, 60, 0.1)']; // Vermelho
+            if (score >= 80) return ['rgba(46, 204, 113, 0.8)', 'rgba(46, 204, 113, 0.05)']; // Verde
+            if (score >= 60) return ['rgba(243, 156, 18, 0.8)', 'rgba(243, 156, 18, 0.05)']; // Laranja
+            return ['rgba(231, 76, 60, 0.8)', 'rgba(231, 76, 60, 0.05)']; // Vermelho
         };
         const [colorStart, colorEnd] = getColorStops(lastScore100);
         gradient.addColorStop(0, colorStart);
@@ -542,6 +556,15 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
+        // Gradients para visual 3D/Moderno
+        const gradientNonProd = ctx.createLinearGradient(0, 0, 0, 400);
+        gradientNonProd.addColorStop(0, 'rgba(52, 152, 219, 1)');
+        gradientNonProd.addColorStop(1, 'rgba(41, 128, 185, 0.8)');
+
+        const gradientProd = ctx.createLinearGradient(0, 0, 0, 400);
+        gradientProd.addColorStop(0, 'rgba(231, 76, 60, 1)');
+        gradientProd.addColorStop(1, 'rgba(192, 57, 43, 0.8)');
+
         bugsChart = new Chart(ctx, {
             type: 'bar',
             data: {
@@ -550,20 +573,20 @@ document.addEventListener('DOMContentLoaded', function() {
                     {
                         label: 'Bugs Não Produtivos',
                         data: nonProdBugsData,
-                        backgroundColor: 'rgba(52, 152, 219, 0.8)',
-                        borderColor: 'rgba(52, 152, 219, 1)',
+                        backgroundColor: gradientNonProd,
+                        borderColor: 'rgba(52, 152, 219, 0)',
                         borderWidth: 0,
-                        borderRadius: 6,
+                        borderRadius: 4,
                         barPercentage: 0.7,
                         categoryPercentage: 0.8
                     },
                     {
                         label: 'Bugs em Produção',
                         data: prodBugsData,
-                        backgroundColor: 'rgba(231, 76, 60, 0.8)',
-                        borderColor: 'rgba(231, 76, 60, 1)',
+                        backgroundColor: gradientProd,
+                        borderColor: 'rgba(231, 76, 60, 0)',
                         borderWidth: 0,
-                        borderRadius: 6,
+                        borderRadius: 4,
                         barPercentage: 0.7,
                         categoryPercentage: 0.8
                     }
@@ -673,14 +696,23 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
+        const gradLow = ctx.createLinearGradient(0, 0, 0, 400);
+        gradLow.addColorStop(0, '#2ecc71'); gradLow.addColorStop(1, '#27ae60');
+        
+        const gradMed = ctx.createLinearGradient(0, 0, 0, 400);
+        gradMed.addColorStop(0, '#f1c40f'); gradMed.addColorStop(1, '#f39c12');
+        
+        const gradHigh = ctx.createLinearGradient(0, 0, 0, 400);
+        gradHigh.addColorStop(0, '#e74c3c'); gradHigh.addColorStop(1, '#c0392b');
+
         bugsSeverityChart = new Chart(ctx, {
             type: 'bar',
             data: {
                 labels: months.map(formatMonth),
                 datasets: [
-                    { label: 'Baixa', data: lowData, backgroundColor: 'rgba(46, 204, 113, 0.7)', stack: 'stack0' },
-                    { label: 'Média', data: mediumData, backgroundColor: 'rgba(243, 156, 18, 0.7)', stack: 'stack0' },
-                    { label: 'Alta', data: highData, backgroundColor: 'rgba(231, 76, 60, 0.7)', stack: 'stack0' }
+                    { label: 'Baixa', data: lowData, backgroundColor: gradLow, borderRadius: 4, stack: 'stack0' },
+                    { label: 'Média', data: mediumData, backgroundColor: gradMed, borderRadius: 4, stack: 'stack0' },
+                    { label: 'Alta', data: highData, backgroundColor: gradHigh, borderRadius: 4, stack: 'stack0' }
                 ]
             },
             options: {
@@ -885,15 +917,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 datasets: [{
                     data: [totalProd, totalNonProd],
                     backgroundColor: [
-                        'rgba(0, 51, 160, 0.7)', // Blue for production issues
-                        'rgba(0, 167, 157, 0.7)'  // Green for non-prod
+                        '#0033A0', // Sura Blue
+                        '#00A79D'  // Sura Green
                     ],
                     borderColor: [
                         '#ffffff',
                         '#ffffff'
                     ],
-                    borderWidth: 2,
-                    borderRadius: 5
+                    borderWidth: 3,
+                    hoverOffset: 4
                 }]
             },
             options: {
@@ -1041,6 +1073,9 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
+        const gradCTs = ctx.createLinearGradient(0, 0, 0, 300);
+        gradCTs.addColorStop(0, '#9b59b6'); gradCTs.addColorStop(1, '#8e44ad');
+
         testCasesPerUsChart = new Chart(ctx, {
             type: 'bar',
             data: {
@@ -1048,10 +1083,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 datasets: [{
                     label: 'Média de CTs por US',
                     data: avgData,
-                    backgroundColor: 'rgba(155, 89, 182, 0.7)', // Purple
-                    borderColor: 'rgba(155, 89, 182, 1)',
-                    borderWidth: 1,
-                    borderRadius: 5,
+                    backgroundColor: gradCTs,
+                    borderRadius: 4,
+                    barPercentage: 0.6,
                     order: 2
                 }, {
                     type: 'line',
@@ -1132,14 +1166,23 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
+        const gradEscrita = ctx.createLinearGradient(0, 0, 0, 300);
+        gradEscrita.addColorStop(0, '#3498db'); gradEscrita.addColorStop(1, '#2980b9');
+
+        const gradExec = ctx.createLinearGradient(0, 0, 0, 300);
+        gradExec.addColorStop(0, '#2ecc71'); gradExec.addColorStop(1, '#27ae60');
+
+        const gradReexec = ctx.createLinearGradient(0, 0, 0, 300);
+        gradReexec.addColorStop(0, '#e67e22'); gradReexec.addColorStop(1, '#d35400');
+
         qaEfficiencyChart = new Chart(ctx, {
             type: 'bar',
             data: {
                 labels: months.map(formatMonth),
                 datasets: [
-                    { label: 'Escrita (Meta: 7\')', data: escritaData, backgroundColor: 'rgba(52, 152, 219, 0.7)', borderColor: 'rgba(52, 152, 219, 1)', borderWidth: 1 },
-                    { label: 'Execução (Meta: 7\')', data: execucaoData, backgroundColor: 'rgba(46, 204, 113, 0.7)', borderColor: 'rgba(46, 204, 113, 1)', borderWidth: 1 },
-                    { label: 'Reexecução (Meta: 5\')', data: reexecucaoData, backgroundColor: 'rgba(243, 156, 18, 0.7)', borderColor: 'rgba(243, 156, 18, 1)', borderWidth: 1 }
+                    { label: 'Escrita (Meta: 7\')', data: escritaData, backgroundColor: gradEscrita, borderRadius: 4, barPercentage: 0.6 },
+                    { label: 'Execução (Meta: 7\')', data: execucaoData, backgroundColor: gradExec, borderRadius: 4, barPercentage: 0.6 },
+                    { label: 'Reexecução (Meta: 5\')', data: reexecucaoData, backgroundColor: gradReexec, borderRadius: 4, barPercentage: 0.6 }
                 ]
             },
             options: {
@@ -1233,6 +1276,9 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
+        const gradSpill = ctx.createLinearGradient(0, 0, 0, 300);
+        gradSpill.addColorStop(0, '#e67e22'); gradSpill.addColorStop(1, '#d35400');
+
         spilloverChart = new Chart(ctx, {
             type: 'bar',
             data: {
@@ -1240,10 +1286,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 datasets: [{
                     label: 'User Stories Recorrentes (Transbordo)',
                     data: spilloverData,
-                    backgroundColor: 'rgba(230, 126, 34, 0.7)', // Carrot Orange
-                    borderColor: 'rgba(230, 126, 34, 1)',
-                    borderWidth: 1,
-                    borderRadius: 5
+                    backgroundColor: gradSpill,
+                    borderRadius: 4,
+                    barPercentage: 0.5
                 }]
             },
             options: {

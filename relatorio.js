@@ -375,7 +375,7 @@ function generateSprintHTML(sprintData, cumulativeScenarios = null, previousIds 
         fragment.appendChild(detailTable);
     }
 
-    fragment.appendChild(createTable('Métricas de Qualidade', [
+    fragment.appendChild(createTable('Execuções QA', [
         createMetricRow('Lead Time de Testes', sprintData.leadTimeTestes, ' dias', METRIC_TARGETS.leadTimeTestes),
         createMetricRow('Lead Time de Bugs', sprintData.leadTimeBugs, ' dias', METRIC_TARGETS.leadTimeBugs),
         createMetricRow('Lead Time de Bugs produção', sprintData.leadTimeBugsProd || 0, ' dias', METRIC_TARGETS.leadTimeBugsProd)

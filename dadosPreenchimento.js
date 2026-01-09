@@ -431,11 +431,11 @@ const dadosRelatorio = {
           "media": 0,
           "alta": 0
         },
-        "coberturaTestesPercentual": 213.33,
+        "coberturaTestesPercentual": 255.56,
         "leadTimeTestes": 4,
         "leadTimeBugs": 1,
-        "usSprint": 5,
-        "casosTestePorUs": 32,
+        "usSprint": 6,
+        "casosTestePorUs": 46,
         "testesAutomatizados": {
           "cenarios": 0,
           "tempoManual": 360,
@@ -448,38 +448,45 @@ const dadosRelatorio = {
         "leadTimeBugsProd": 0,
         "listaUserStories": [
           {
-            "nome": "38386",
-            "cts": 3,
-            "executed": 2,
-            "passed": 2,
+            "nome": "38280",
+            "cts": 10,
+            "executed": 10,
+            "passed": 10,
             "failed": 0
           },
           {
-            "nome": "38446",
+            "nome": "38298",
+            "cts": 12,
+            "executed": 12,
+            "passed": 12,
+            "failed": 0
+          },
+          {
+            "nome": "38289",
             "cts": 5,
             "executed": 5,
             "passed": 5,
             "failed": 0
           },
           {
-            "nome": "30960",
+            "nome": "32469",
+            "cts": 7,
+            "executed": 7,
+            "passed": 7,
+            "failed": 0
+          },
+          {
+            "nome": "35168",
+            "cts": 3,
+            "executed": 2,
+            "passed": 2,
+            "failed": 0
+          },
+          {
+            "nome": "30959",
             "cts": 9,
-            "executed": 0,
-            "passed": 0,
-            "failed": 0
-          },
-          {
-            "nome": "38281",
-            "cts": 11,
-            "executed": 11,
-            "passed": 11,
-            "failed": 0
-          },
-          {
-            "nome": "38452",
-            "cts": 4,
-            "executed": 4,
-            "passed": 4,
+            "executed": 8,
+            "passed": 8,
             "failed": 0
           }
         ],

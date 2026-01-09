@@ -209,13 +209,15 @@ function updateSprintData() {
         document.getElementById('sprint2-header').textContent = sprint2.nome;
     }
 
+    const previousIdsS1 = getPreviousSprintIds(appState.currentMonth, appState.currentCenter, 'sprint1');
     const cumulativeS1 = calculateCumulativeScenarios(appState.currentMonth, appState.currentCenter, 'sprint1');
     const sprint1Content = document.getElementById('sprint1-content');
-    sprint1Content.replaceChildren(generateSprintHTML(sprint1, cumulativeS1));
+    sprint1Content.replaceChildren(generateSprintHTML(sprint1, cumulativeS1, previousIdsS1));
 
+    const previousIdsS2 = getPreviousSprintIds(appState.currentMonth, appState.currentCenter, 'sprint2');
     const cumulativeS2 = calculateCumulativeScenarios(appState.currentMonth, appState.currentCenter, 'sprint2');
     const sprint2Content = document.getElementById('sprint2-content');
-    sprint2Content.replaceChildren(generateSprintHTML(sprint2, cumulativeS2));
+    sprint2Content.replaceChildren(generateSprintHTML(sprint2, cumulativeS2, previousIdsS2));
 }
 
 /**
@@ -297,7 +299,7 @@ function createTable(title, rows) {
  * @param {object} sprintData - Os dados da sprint.
  * @returns {DocumentFragment} - Um fragmento de documento com o HTML da sprint.
  */
-function generateSprintHTML(sprintData, cumulativeScenarios = null) {
+function generateSprintHTML(sprintData, cumulativeScenarios = null, previousIds = new Set()) {
     const fragment = document.createDocumentFragment();
 
     // Cálculos de métricas
@@ -339,9 +341,12 @@ function generateSprintHTML(sprintData, cumulativeScenarios = null) {
             const passed = us.passed || 0;
             const passedClass = passed < executed ? 'negative' : '';
             const failed = (us.failed !== undefined) ? us.failed : (executed - passed);
+            
+            const isSpillover = us.nome && previousIds.has(String(us.nome));
+            const spilloverIcon = isSpillover ? '<span title="Transbordo de sprint anterior" style="cursor: help; margin-right: 4px;">🔄</span>' : '';
 
             row.innerHTML = `
-                <td style="padding-left: 20px; color: #555;">• ${us.nome || 'Sem nome'}</td>
+                <td style="padding-left: 20px; color: #555;">${spilloverIcon}• ${us.nome || 'Sem nome'}</td>
                 <td class="${ctsClass}">${cts}</td>
                 <td>${executed}</td>
                 <td class="${passedClass}">${passed}</td>
@@ -416,6 +421,38 @@ function generateBugsProdutivosHTML(bugsData) {
         createMetricRow('Média Criticidade', bugsData.media, '', METRIC_TARGETS.bugsProducao.media),
         createMetricRow('Alta Criticidade', bugsData.alta, '', METRIC_TARGETS.bugsProducao.alta)
     ]);
+}
+
+/**
+ * Retorna um Set com os IDs das User Stories de sprints anteriores para detecção de transbordo.
+ */
+function getPreviousSprintIds(targetMonth, center, targetSprintKey) {
+    const months = Object.keys(dadosRelatorio).sort();
+    const previousIds = new Set();
+
+    for (const month of months) {
+        const centerData = dadosRelatorio[month][center];
+        if (!centerData) continue;
+
+        // Se chegamos no mês alvo
+        if (month === targetMonth) {
+            if (targetSprintKey === 'sprint1') {
+                return previousIds;
+            } else if (targetSprintKey === 'sprint2') {
+                if (centerData.sprint1 && centerData.sprint1.listaUserStories) {
+                    centerData.sprint1.listaUserStories.forEach(us => { if(us.nome) previousIds.add(String(us.nome)); });
+                }
+                return previousIds;
+            }
+        }
+
+        // Meses anteriores
+        if (month < targetMonth) {
+            if (centerData.sprint1 && centerData.sprint1.listaUserStories) centerData.sprint1.listaUserStories.forEach(us => { if(us.nome) previousIds.add(String(us.nome)); });
+            if (centerData.sprint2 && centerData.sprint2.listaUserStories) centerData.sprint2.listaUserStories.forEach(us => { if(us.nome) previousIds.add(String(us.nome)); });
+        }
+    }
+    return previousIds;
 }
 
 /**

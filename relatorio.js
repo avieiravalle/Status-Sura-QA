@@ -257,6 +257,9 @@ function createMetricRow(label, value, unit, targetConfig) {
     if (targetConfig && targetConfig.evaluate !== false) {
         const isMet = targetConfig.higherIsBetter ? value >= targetConfig.value : value <= targetConfig.value;
         valueCell.className = isMet ? 'positive' : 'negative';
+        if (!isMet) {
+            valueCell.style.fontWeight = 'bold';
+        }
     }
     row.appendChild(valueCell);
  
@@ -282,10 +285,14 @@ function createTable(title, rows) {
     const headerCell = document.createElement('th');
     headerCell.colSpan = 2;
     headerCell.textContent = title;
+    headerCell.style.backgroundColor = '#0033A0';
+    headerCell.style.color = '#ffffff';
     headerRow.appendChild(headerCell);
 
     const metaHeaderCell = document.createElement('th');
     metaHeaderCell.textContent = 'Meta';
+    metaHeaderCell.style.backgroundColor = '#0033A0';
+    metaHeaderCell.style.color = '#ffffff';
     headerRow.appendChild(metaHeaderCell);
 
     const tbody = table.createTBody();
@@ -337,9 +344,11 @@ function generateSprintHTML(sprintData, cumulativeScenarios = null, previousIds 
             row.className = 'data-row';
             const cts = us.cts || 0;
             const ctsClass = cts < 4 ? 'negative' : '';
+            const ctsStyle = ctsClass === 'negative' ? 'style="font-weight: bold;"' : '';
             const executed = us.executed || 0;
             const passed = us.passed || 0;
             const passedClass = passed < executed ? 'negative' : '';
+            const passedStyle = passedClass === 'negative' ? 'style="font-weight: bold;"' : '';
             const failed = (us.failed !== undefined) ? us.failed : (executed - passed);
             
             const isSpillover = us.nome && previousIds.has(String(us.nome));
@@ -347,9 +356,9 @@ function generateSprintHTML(sprintData, cumulativeScenarios = null, previousIds 
 
             row.innerHTML = `
                 <td style="padding-left: 20px; color: #555;">${spilloverIcon}• ${us.nome || 'Sem nome'}</td>
-                <td class="${ctsClass}">${cts}</td>
+                <td class="${ctsClass}" ${ctsStyle}>${cts}</td>
                 <td>${executed}</td>
-                <td class="${passedClass}">${passed}</td>
+                <td class="${passedClass}" ${passedStyle}>${passed}</td>
                 <td style="color: #e74c3c; font-weight: bold;">${failed}</td>
             `;
             return row;
@@ -367,6 +376,8 @@ function generateSprintHTML(sprintData, cumulativeScenarios = null, previousIds 
             const titleCell = document.createElement('th');
             titleCell.colSpan = 5;
             titleCell.textContent = 'Detalhamento por História';
+            titleCell.style.backgroundColor = '#0033A0';
+            titleCell.style.color = '#ffffff';
             titleRow.appendChild(titleCell);
             thead.appendChild(titleRow);
             thead.appendChild(headerRow);
@@ -555,6 +566,9 @@ function updateSummary() {
 
             const valueSpan = document.createElement('span');
             valueSpan.className = `metric-value ${status}`;
+            if (status === 'negative') {
+                valueSpan.style.fontWeight = 'bold';
+            }
             const formattedValue = isFinite(value) ? (Number.isInteger(value) ? value : value.toFixed(1)) : '∞';
             valueSpan.textContent = `${formattedValue}${metricConfig.unit}`;
 

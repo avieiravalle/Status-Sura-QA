@@ -1481,7 +1481,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 trendArrow,
                 statusClass,
                 statusText,
-                rowClass: statusClass.replace('badge-', 'status-')
+                rowClass: statusClass.replace('badge-', 'status-'),
+                targetFmt: metric.format(metric.target)
             };
         });
 
@@ -1489,6 +1490,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function renderTrendTable() {
+        // Injeta a coluna de Meta no cabeçalho se não existir
+        const headerRow = document.querySelector('.trend-table thead tr');
+        if (headerRow && headerRow.children.length === 5) {
+            const metaTh = document.createElement('th');
+            metaTh.textContent = 'Meta';
+            headerRow.insertBefore(metaTh, headerRow.lastElementChild);
+        }
+
         const tableBody = document.getElementById('trend-table-body');
         tableBody.innerHTML = '';
 
@@ -1519,6 +1528,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <td>${item.prevFmt}</td>
                 <td>${item.currFmt}</td>
                 <td class="${item.trendClass}">${item.change >= 0 ? '+' : ''}${item.change.toFixed(1)}% ${item.trendArrow}</td>
+                <td style="font-weight: bold; color: #555;">${item.targetFmt}</td>
                 <td><span class="metric-badge ${item.statusClass}">${item.statusText}</span></td>
             `;
             tableBody.appendChild(row);

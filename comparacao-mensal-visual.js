@@ -130,7 +130,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Variáveis globais
     let currentCenter;
-    let codeCoverageChart, bugsChart, leadTimeChart, overallHealthChart, reworkChart, automatedTestsChart, bugsSeverityChart, testCasesPerUsChart, qaEfficiencyChart;
+    let codeCoverageChart, bugsChart, leadTimeChart, overallHealthChart, reworkChart, automatedTestsChart, bugsSeverityChart, testCasesPerUsChart, qaEfficiencyChart, spilloverChart;
     let currentSort = { column: null, direction: 'asc' };
     let currentTrendMetrics = [];
     
@@ -232,6 +232,7 @@ document.addEventListener('DOMContentLoaded', function() {
         updateAutomatedTestsChart();
         updateTestCasesPerUsChart();
         updateQaEfficiencyChart();
+        updateSpilloverChart();
         updateTrendAnalysis();
     }
     
@@ -1155,6 +1156,116 @@ document.addEventListener('DOMContentLoaded', function() {
                         anchor: 'end', align: 'top', color: '#555', font: { weight: 'bold', size: 11 },
                         formatter: (value) => value > 0 ? value.toFixed(1) : ''
                     }
+                }
+            }
+        });
+    }
+
+    // Gráfico de Transbordo (Spillover)
+    function updateSpilloverChart() {
+        // Tenta encontrar o canvas, se não existir, cria dinamicamente na seção de gráficos
+        let canvas = document.getElementById('spillover-chart');
+        if (!canvas) {
+            const chartsSection = document.querySelector('.charts-section');
+            if (chartsSection) {
+                const container = document.createElement('div');
+                container.className = 'chart-container';
+                // Estilos inline para garantir consistência visual
+                container.style.backgroundColor = '#fff';
+                container.style.borderRadius = '8px';
+                container.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+                container.style.padding = '15px';
+                container.style.margin = '10px';
+                container.style.minHeight = '300px';
+                container.style.flex = '1 1 45%'; // Tenta ocupar metade da largura em layouts flex
+
+                canvas = document.createElement('canvas');
+                canvas.id = 'spillover-chart';
+                
+                container.appendChild(canvas);
+                chartsSection.appendChild(container);
+            } else {
+                return; // Não foi possível encontrar onde inserir
+            }
+        }
+
+        const ctx = canvas.getContext('2d');
+        const monthsToDisplay = getAvailableMonths();
+        const allMonths = Object.keys(dadosRelatorio).filter(m => m !== 'historico').sort();
+        
+        const spilloverData = [];
+        const seenUS = new Set();
+
+        // Itera sobre todo o histórico para construir o conjunto de US vistas corretamente
+        allMonths.forEach(month => {
+            const centerData = dadosRelatorio[month]?.[currentCenter];
+            let monthlySpillover = 0;
+
+            if (centerData) {
+                const checkSprint = (sprint) => {
+                    if (sprint && sprint.listaUserStories) {
+                        sprint.listaUserStories.forEach(us => {
+                            if (us.nome) {
+                                const id = String(us.nome).trim();
+                                if (seenUS.has(id)) {
+                                    monthlySpillover++;
+                                } else {
+                                    seenUS.add(id);
+                                }
+                            }
+                        });
+                    }
+                };
+                checkSprint(centerData.sprint1);
+                checkSprint(centerData.sprint2);
+            }
+
+            // Só adiciona aos dados do gráfico se o mês estiver na visualização atual
+            if (monthsToDisplay.includes(month)) {
+                spilloverData.push(monthlySpillover);
+            }
+        });
+
+        if (spilloverChart) {
+            spilloverChart.data.labels = monthsToDisplay.map(formatMonth);
+            spilloverChart.data.datasets[0].data = spilloverData;
+            spilloverChart.update();
+            return;
+        }
+
+        spilloverChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: monthsToDisplay.map(formatMonth),
+                datasets: [{
+                    label: 'User Stories Recorrentes (Transbordo)',
+                    data: spilloverData,
+                    backgroundColor: 'rgba(230, 126, 34, 0.7)', // Carrot Orange
+                    borderColor: 'rgba(230, 126, 34, 1)',
+                    borderWidth: 1,
+                    borderRadius: 5
+                }]
+            },
+            options: {
+                layout: { padding: { top: 25 } },
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { display: true, text: 'Qtd. US', font: { weight: 'bold', size: 14 } },
+                        grid: { borderDash: [5, 5], color: 'rgba(0,0,0,0.05)' },
+                        ticks: { stepSize: 1 }
+                    },
+                    x: { grid: { display: false } }
+                },
+                plugins: {
+                    title: { display: true, text: 'Volume de Transbordo (Spillover)', font: { size: 18 } },
+                    datalabels: {
+                        anchor: 'end', align: 'top', color: '#555', font: { weight: 'bold', size: 12 },
+                        formatter: (value) => value > 0 ? value : ''
+                    },
+                    legend: { display: true, position: 'bottom' }
                 }
             }
         });

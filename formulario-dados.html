@@ -28,7 +28,7 @@
             -webkit-appearance: none; 
             margin: 0; 
         }
-        .us-table input[type=number] { -moz-appearance: textfield; }
+        .us-table input[type=number] { -moz-appearance: textfield; appearance: textfield; }
 
         * {
             box-sizing: border-box;
@@ -643,7 +643,7 @@
                 current[keys[keys.length - 1]] = value;
             }
 
-            function saveData() {
+            async function saveData() {
                 const selectedMonth = monthSelect.value;
                 const selectedProduct = productSelect.value;
 
@@ -685,7 +685,22 @@
                 outputTextarea.value = fileContent;
                 outputSection.style.display = 'block';
 
-                showToast('Dados gerados para atualização. Copie ou faça o download.', 'success');
+                try {
+                    const response = await fetch('/save-data', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(sessionData)
+                    });
+
+                    if (response.ok) {
+                        showToast('Dados salvos com sucesso!', 'success');
+                    } else {
+                        showToast('Erro ao salvar no servidor. Use o botão de Download.', 'error');
+                    }
+                } catch (error) {
+                    console.error('Erro ao salvar:', error);
+                    showToast('Erro de conexão. Use o botão de Download.', 'error');
+                }
             }
 
             function downloadFile(content, fileName, mimeType = 'text/javascript') {
@@ -1043,13 +1058,11 @@
             // Cálculo automático da Cobertura de Testes (Funcional)
             const cobTestesInput = document.getElementById(`${sprintKey}-coberturaTestesPercentual`);
             if (cobTestesInput) {
-                if (totalUS > 0) {
-                    // Fórmula: (Total CTs / (Total US * 3)) * 100
-                    const cob = (totalCTs / (totalUS * 3)) * 100;
-                    cobTestesInput.value = parseFloat(cob.toFixed(2));
-                } else {
-                    cobTestesInput.value = 0;
-                }
+                // Usa a meta configurada ou o padrão 4
+                const density = (sessionData.metas && sessionData.metas.densidadeTestes) ? sessionData.metas.densidadeTestes : 4;
+                // Usa a função centralizada do utils.js (baseada em execução e meta)
+                const cob = calculateTestCoverage(totalUS, totalExec, density);
+                cobTestesInput.value = cob;
             }
         };
     </script>

@@ -251,7 +251,7 @@ function createMetricRow(label, value, unit, targetConfig) {
     row.appendChild(labelCell);
  
     const valueCell = document.createElement('td');
-    valueCell.textContent = `${value.toLocaleString('pt-BR')}${unit}`;
+    valueCell.textContent = (targetConfig && targetConfig.customDisplay) ? targetConfig.customDisplay : `${value.toLocaleString('pt-BR')}${unit}`;
  
     // A cor do valor é definida pelo atingimento da meta.
     if (targetConfig && targetConfig.evaluate !== false) {
@@ -313,6 +313,30 @@ function generateSprintHTML(sprintData, cumulativeScenarios = null, previousIds 
     const coberturaTestesCalc = calculateTestCoverage(sprintData.usSprint, sprintData.casosTestePorUs);
     const mediaCtsPorUs = sprintData.usSprint > 0 ? Math.round(sprintData.casosTestePorUs / sprintData.usSprint) : 0;
 
+    // Cálculo automático de totais e Pass Rate baseado nas User Stories
+    let totalExecuted = sprintData.ctExecutados || 0;
+    let totalPassed = sprintData.ctPassados || (sprintData.passRate !== undefined ? Math.round((sprintData.passRate / 100) * totalExecuted) : 0);
+    let passRateCalc = sprintData.passRate;
+
+    if (sprintData.listaUserStories && sprintData.listaUserStories.length > 0) {
+        totalExecuted = 0;
+        totalPassed = 0;
+        sprintData.listaUserStories.forEach(us => {
+            const passed = (us.passed !== undefined && us.passed !== null && us.passed !== '') ? Number(us.passed) : 0;
+            const failed = (us.failed !== undefined && us.failed !== null && us.failed !== '') ? Number(us.failed) : 0;
+            const executed = passed + failed;
+            totalExecuted += executed;
+            totalPassed += passed;
+        });
+        passRateCalc = totalExecuted > 0 ? Number(((totalPassed / totalExecuted) * 100).toFixed(1)) : 0;
+    }
+
+    // Identifica se houve reexecuções (Execuções > Planejado)
+    const percentExecuted = sprintData.casosTestePorUs > 0 ? Math.round((totalExecuted / sprintData.casosTestePorUs) * 100) : 0;
+    const execDisplay = (sprintData.casosTestePorUs > 0 && totalExecuted > sprintData.casosTestePorUs) 
+        ? `${totalExecuted} (${percentExecuted}% do planejado)` 
+        : totalExecuted;
+
     fragment.appendChild(createTable('Cobertura de Código', [
         createMetricRow('Linhas', sprintData.coberturaCodigo.linhas, '%', METRIC_TARGETS.coberturaCodigo.linhas),
         createMetricRow('Classes', sprintData.coberturaCodigo.classes, '%', METRIC_TARGETS.coberturaCodigo.classes),
@@ -322,9 +346,10 @@ function generateSprintHTML(sprintData, cumulativeScenarios = null, previousIds 
 
     fragment.appendChild(createTable('Cobertura de Testes (Funcional)', [
         createMetricRow('User Stories (US)', sprintData.usSprint, '', { value: `1 US / ${mediaCtsPorUs} CTs`, evaluate: false }),
-        createMetricRow('Casos de Teste Criados', sprintData.casosTestePorUs, '', null),
+        createMetricRow('Casos de Teste Criados', percentExecuted, '%', { value: 90, higherIsBetter: true, customDisplay: `${percentExecuted}% (${totalExecuted}/${sprintData.casosTestePorUs})` }),
+        createMetricRow('Execuções Totais', totalExecuted, '', { value: totalExecuted, evaluate: false, customDisplay: execDisplay }),
         createMetricRow('Cobertura Atingida', coberturaTestesCalc, '%', METRIC_TARGETS.coberturaTestesPercentual),
-        createMetricRow('Pass Rate', sprintData.passRate, '%', METRIC_TARGETS.passRate)
+        createMetricRow('Pass Rate', passRateCalc, '%', { ...METRIC_TARGETS.passRate, customDisplay: `${passRateCalc}% (${totalPassed}/${totalExecuted})` })
     ]));
 
     // Se houver detalhamento de User Stories, adiciona uma tabela extra
@@ -345,11 +370,11 @@ function generateSprintHTML(sprintData, cumulativeScenarios = null, previousIds 
             const cts = us.cts || 0;
             const ctsClass = cts < 4 ? 'negative' : '';
             const ctsStyle = ctsClass === 'negative' ? 'style="font-weight: bold;"' : '';
-            const executed = us.executed || 0;
-            const passed = us.passed || 0;
+            const passed = (us.passed !== undefined && us.passed !== null && us.passed !== '') ? Number(us.passed) : 0;
+            const failed = (us.failed !== undefined && us.failed !== null && us.failed !== '') ? Number(us.failed) : 0;
+            const executed = passed + failed;
             const passedClass = passed < executed ? 'negative' : '';
             const passedStyle = passedClass === 'negative' ? 'style="font-weight: bold;"' : '';
-            const failed = (us.failed !== undefined) ? us.failed : (executed - passed);
             
             const isSpillover = us.nome && previousIds.has(String(us.nome));
             const spilloverIcon = isSpillover ? '<span title="Transbordo de sprint anterior" style="cursor: help; margin-right: 4px;">🔄</span>' : '';

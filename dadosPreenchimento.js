@@ -35,8 +35,8 @@ const dadosRelatorio = {
           {
             "nome": "38080",
             "cts": 6,
-            "executed": 7,
-            "passed": 7,
+            "executed": 6,
+            "passed": 6,
             "failed": 0
           },
           {

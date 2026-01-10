@@ -337,7 +337,7 @@
             // 1. Popular seletores
             function populateSelectors() {
                 monthSelect.innerHTML = '';
-                const months = Object.keys(sessionData).sort().reverse();
+                const months = Object.keys(sessionData).filter(k => /^\d{4}-\d{2}$/.test(k)).sort().reverse();
                 months.forEach(month => {
                     const option = new Option(formatMonth(month), month);
                     monthSelect.add(option);
@@ -387,7 +387,10 @@
                     }
                     // Migração: Testes Automatizados
                     if (!productData[sprintKey].testesAutomatizados) {
-                        productData[sprintKey].testesAutomatizados = { cenarios: 0, tempoManual: 0, tempoAutom: 0 };
+                        productData[sprintKey].testesAutomatizados = { cenarios: 0, execucoes: 0, tempoManual: 0, tempoAutom: 0 };
+                    }
+                    if (typeof productData[sprintKey].testesAutomatizados.execucoes === 'undefined') {
+                        productData[sprintKey].testesAutomatizados.execucoes = 0;
                     }
                     if (typeof productData[sprintKey].leadTimeBugsProd === 'undefined') productData[sprintKey].leadTimeBugsProd = 0;
                     
@@ -543,6 +546,7 @@
                             <label>Automação de Testes</label>
                             <div class="sub-group">
                                 ${generateInput(sprintKey, 'testesAutomatizados.cenarios', data.testesAutomatizados.cenarios, 'Cenários')}
+                                ${generateInput(sprintKey, 'testesAutomatizados.execucoes', data.testesAutomatizados.execucoes, 'Execuções')}
                                 ${generateInput(sprintKey, 'testesAutomatizados.tempoManual', data.testesAutomatizados.tempoManual, 'Tempo Manual (min)')}
                                 ${generateInput(sprintKey, 'testesAutomatizados.tempoAutom', data.testesAutomatizados.tempoAutom, 'Tempo Autom. (min)')}
                             </div>
@@ -759,7 +763,7 @@
             // --- Função de Arquivamento ---
             function openArchiveModal() {
                 archiveCutoffSelect.innerHTML = '';
-                const months = Object.keys(sessionData).sort(); // Ordem cronológica (antigos primeiro)
+                const months = Object.keys(sessionData).filter(k => /^\d{4}-\d{2}$/.test(k)).sort(); // Ordem cronológica (antigos primeiro)
                 
                 if (months.length < 2) {
                     showToast('É necessário ter pelo menos 2 meses para realizar o arquivamento.', 'info');
@@ -820,7 +824,7 @@
                 bugsNaoProdutivos: { baixa: 5, media: 3, alta: 1, total: 10 },
                 bugsProducao: { baixa: 5, media: 2, alta: 0, total: 2 },
                 eficienciaQa: { escrita: 7, execucao: 7, reexecucao: 5 },
-                automacao: { cenariosNovos: 5 },
+                automacao: { cenariosNovos: 5, tempoManual: 0 },
                 healthScore: { target: 8.0, limits: { nonProdBugs: 20, prodBugs: 10, leadTime: 10 } }
             };
 
@@ -888,6 +892,15 @@
                 // Outros
                 html += group('Outros', 
                     input('automacao.cenariosNovos', 'Automação (Novos Cenários)', metas.automacao?.cenariosNovos ?? 5) +
+                    `<div class="input-group">
+                        <label>Tipo de Execução</label>
+                        <select class="meta-input" data-path="automacao.tipoExecucao">
+                            <option value="Smoke" ${metas.automacao?.tipoExecucao === 'Smoke' ? 'selected' : ''}>Smoke</option>
+                            <option value="E2E" ${metas.automacao?.tipoExecucao === 'E2E' ? 'selected' : ''}>E2E</option>
+                        </select>
+                    </div>` +
+                    input('automacao.execucoes', 'Meta de Execuções', metas.automacao?.execucoes ?? 0) +
+                    input('automacao.tempoManual', 'Meta Tempo Manual (min)', metas.automacao?.tempoManual ?? 0) +
                     input('healthScore.target', 'Meta Health Score', metas.healthScore?.target ?? 8.0, 0.1)
                 );
                 
@@ -900,8 +913,13 @@
 
                 inputs.forEach(input => {
                     const path = input.dataset.path;
-                    const value = parseFloat(input.value);
-                    setNestedValue(sessionData.metas, path, isNaN(value) ? 0 : value);
+                    let value = input.value;
+                    // Se for input numérico, converte. Se for select (texto), mantém.
+                    if (input.type === 'number') {
+                        value = parseFloat(value);
+                        if (isNaN(value)) value = 0;
+                    }
+                    setNestedValue(sessionData.metas, path, value);
                 });
 
                 metasModal.style.display = 'none';
@@ -927,7 +945,7 @@
                     // coberturaTestesPercentual: 0, // Removido
                     leadTimeBugs: 0,
                     leadTimeBugsProd: 0,
-                    testesAutomatizados: { cenarios: 0, tempoManual: 0, tempoAutom: 0 },
+                    testesAutomatizados: { cenarios: 0, execucoes: 0, tempoManual: 0, tempoAutom: 0 },
                     listaUserStories: [],
                     reexecucaoBugsNaoProd: 0,
                     reexecucaoBugsProd: 0,

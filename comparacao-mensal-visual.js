@@ -221,7 +221,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const allProducts = new Set();
         
         Object.keys(dadosRelatorio).forEach(month => {
-            if (month === 'historico') return;
+            if (!/^\d{4}-\d{2}$/.test(month)) return;
             Object.keys(dadosRelatorio[month]).forEach(prod => allProducts.add(prod));
         });
         
@@ -298,7 +298,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Função para obter meses disponíveis ordenados
     function getAvailableMonths() {
         const months = Object.keys(dadosRelatorio).filter(month => 
-            month !== 'historico' && dadosRelatorio[month][currentCenter]
+            /^\d{4}-\d{2}$/.test(month) && dadosRelatorio[month][currentCenter]
         ).sort();
         
         const periodSelect = document.getElementById('period-select');
@@ -1024,7 +1024,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const ctx = canvas.getContext('2d');
         const monthsToDisplay = getAvailableMonths();
-        const allMonths = Object.keys(dadosRelatorio).filter(m => m !== 'historico').sort();
+        const allMonths = Object.keys(dadosRelatorio).filter(m => /^\d{4}-\d{2}$/.test(m)).sort();
         
         const spilloverData = [];
         const seenUS = new Set();

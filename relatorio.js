@@ -35,6 +35,12 @@ const METRIC_TARGETS = {
         escrita: { value: 7, higherIsBetter: false },
         execucao: { value: 7, higherIsBetter: false },
         reexecucao: { value: 5, higherIsBetter: false }
+    },
+    automacao: {
+        cenariosNovos: { value: 5, higherIsBetter: true },
+        execucoes: { value: 0, higherIsBetter: true },
+        tipoExecucao: { value: 'Smoke', higherIsBetter: true },
+        tempoManual: { value: 0, higherIsBetter: false }
     }
 };
 
@@ -95,6 +101,13 @@ function updateMetricTargets() {
         setVal(METRIC_TARGETS.eficienciaQa, 'execucao', metas.eficienciaQa.execucao);
         setVal(METRIC_TARGETS.eficienciaQa, 'reexecucao', metas.eficienciaQa.reexecucao);
     }
+
+    if (metas.automacao) {
+        if (metas.automacao.cenariosNovos !== undefined) METRIC_TARGETS.automacao.cenariosNovos.value = metas.automacao.cenariosNovos;
+        if (metas.automacao.execucoes !== undefined) METRIC_TARGETS.automacao.execucoes.value = metas.automacao.execucoes;
+        if (metas.automacao.tipoExecucao !== undefined) METRIC_TARGETS.automacao.tipoExecucao.value = metas.automacao.tipoExecucao;
+        if (metas.automacao.tempoManual !== undefined) METRIC_TARGETS.automacao.tempoManual.value = metas.automacao.tempoManual;
+    }
 }
 
 /**
@@ -106,7 +119,7 @@ function initializeControls() {
     const productSelect = document.getElementById('product-select');
 
     // 1. Popula o seletor de Mês
-    const months = Object.keys(dadosRelatorio).sort().reverse(); // Mais recentes primeiro
+    const months = Object.keys(dadosRelatorio).filter(k => /^\d{4}-\d{2}$/.test(k)).sort().reverse(); // Mais recentes primeiro
     if (months.length === 0) {
         showDataError();
         return;
@@ -124,7 +137,9 @@ function initializeControls() {
 
     // 2. Popula o seletor de Produto com todos os produtos possíveis de todos os meses
     const allProducts = new Set();
-    Object.values(dadosRelatorio).forEach(monthData => {
+    Object.keys(dadosRelatorio).forEach(monthKey => {
+        if (!/^\d{4}-\d{2}$/.test(monthKey)) return;
+        const monthData = dadosRelatorio[monthKey];
         Object.keys(monthData).forEach(product => allProducts.add(product));
     });
     const productList = Array.from(allProducts).sort();
@@ -266,7 +281,9 @@ function createMetricRow(label, value, unit, targetConfig) {
     row.appendChild(valueCell);
  
     const targetCell = document.createElement('td');
-    targetCell.textContent = (targetConfig && targetConfig.displayTarget !== false) ? `${targetConfig.value.toLocaleString('pt-BR')}${unit}` : '-';
+    // Usa displayValue se existir (para mostrar texto como 'Smoke'), senão usa o valor numérico padrão
+    const targetText = (targetConfig && targetConfig.displayValue) ? targetConfig.displayValue : ((targetConfig && targetConfig.displayTarget !== false) ? `${targetConfig.value.toLocaleString('pt-BR')}${unit}` : '-');
+    targetCell.textContent = targetText;
     row.appendChild(targetCell);
  
     return row;
@@ -434,13 +451,14 @@ function generateSprintHTML(sprintData, cumulativeScenarios = null, previousIds 
     ]));
 
     // Seção de Automação de Testes
-    const autoData = sprintData.testesAutomatizados || { cenarios: 0, tempoManual: 0, tempoAutom: 0 };
+    const autoData = sprintData.testesAutomatizados || { cenarios: 0, execucoes: 0, tempoManual: 0, tempoAutom: 0 };
     const economia = autoData.tempoManual - autoData.tempoAutom;
     const cenariosDisplay = cumulativeScenarios !== null ? cumulativeScenarios : autoData.cenarios;
 
     fragment.appendChild(createTable('Automação de Testes', [
         createMetricRow('Cenários Automatizados', cenariosDisplay, '', { value: 50, higherIsBetter: true, displayTarget: true }),
-        createMetricRow('Tempo Exec. Manual', autoData.tempoManual, ' min', { value: 0, higherIsBetter: false, displayTarget: true }),
+        createMetricRow('Execuções', autoData.execucoes || 0, '', { value: METRIC_TARGETS.automacao.execucoes.value, higherIsBetter: true, displayTarget: true, displayValue: METRIC_TARGETS.automacao.tipoExecucao.value }),
+        createMetricRow('Tempo Exec. Manual', autoData.tempoManual, ' min', METRIC_TARGETS.automacao.tempoManual),
         createMetricRow('Tempo Exec. Automatizado', autoData.tempoAutom, ' min', { value: 60, higherIsBetter: false, displayTarget: true }),
         createMetricRow('Economia de Tempo', economia, ' min', { value: 0, higherIsBetter: true, displayTarget: false })
     ]));
@@ -473,7 +491,7 @@ function generateBugsProdutivosHTML(bugsData) {
  * Retorna um Set com os IDs das User Stories de sprints anteriores para detecção de transbordo.
  */
 function getPreviousSprintIds(targetMonth, center, targetSprintKey) {
-    const months = Object.keys(dadosRelatorio).sort();
+    const months = Object.keys(dadosRelatorio).filter(k => /^\d{4}-\d{2}$/.test(k)).sort();
     const previousIds = new Set();
 
     for (const month of months) {
@@ -505,7 +523,7 @@ function getPreviousSprintIds(targetMonth, center, targetSprintKey) {
  * Calcula o total acumulado de cenários automatizados até a sprint especificada.
  */
 function calculateCumulativeScenarios(targetMonth, center, sprintTarget) {
-    const months = Object.keys(dadosRelatorio).sort();
+    const months = Object.keys(dadosRelatorio).filter(k => /^\d{4}-\d{2}$/.test(k)).sort();
     let total = 0;
 
     for (const month of months) {
@@ -741,7 +759,7 @@ function identifyMissedMetrics() {
 // --- Funções de Ações do Usuário ---
 
 function createNewMonth() {
-    const lastMonth = Object.keys(dadosRelatorio).sort().pop();
+    const lastMonth = Object.keys(dadosRelatorio).filter(k => /^\d{4}-\d{2}$/.test(k)).sort().pop();
     const lastMonthDate = new Date(lastMonth);
 
     lastMonthDate.setUTCMonth(lastMonthDate.getUTCMonth() + 1);

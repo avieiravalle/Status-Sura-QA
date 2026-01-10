@@ -23,6 +23,7 @@ const dadosRelatorio = {
         "casosTestePorUs": 8,
         "testesAutomatizados": {
           "cenarios": 22,
+          "execucoes": 1,
           "tempoManual": 360,
           "tempoAutom": 25
         },
@@ -76,7 +77,8 @@ const dadosRelatorio = {
         "testesAutomatizados": {
           "cenarios": 0,
           "tempoManual": 360,
-          "tempoAutom": 25
+          "tempoAutom": 25,
+          "execucoes": 1
         },
         "ctEscritos": 32,
         "ctExecutados": 68,
@@ -719,7 +721,8 @@ const dadosRelatorio = {
         "testesAutomatizados": {
           "cenarios": 0,
           "tempoManual": 360,
-          "tempoAutom": 25
+          "tempoAutom": 25,
+          "execucoes": 1
         },
         "ctEscritos": 46,
         "ctExecutados": 44,
@@ -799,7 +802,8 @@ const dadosRelatorio = {
         "testesAutomatizados": {
           "cenarios": 0,
           "tempoManual": 360,
-          "tempoAutom": 25
+          "tempoAutom": 25,
+          "execucoes": 2
         },
         "ctEscritos": 0,
         "ctExecutados": 0,
@@ -1139,7 +1143,8 @@ const dadosRelatorio = {
         "testesAutomatizados": {
           "cenarios": 0,
           "tempoManual": 0,
-          "tempoAutom": 0
+          "tempoAutom": 0,
+          "execucoes": 0
         },
         "ctEscritos": 7,
         "ctExecutados": 26,
@@ -1189,9 +1194,10 @@ const dadosRelatorio = {
         "usSprint": 3,
         "casosTestePorUs": 6,
         "testesAutomatizados": {
-          "cenarios": 0,
-          "tempoManual": 0,
-          "tempoAutom": 0
+          "cenarios": 9,
+          "tempoManual": 300,
+          "tempoAutom": 15,
+          "execucoes": 2
         },
         "ctEscritos": 0,
         "ctExecutados": 0,
@@ -1380,6 +1386,52 @@ const dadosRelatorio = {
         "alta": 0
       },
       "qaValor": 26000
+    }
+  },
+  "metas": {
+    "coberturaCodigo": {
+      "linhas": 50,
+      "classes": 50,
+      "metodos": 50,
+      "branches": 50,
+      "geral": 50
+    },
+    "passRate": 90,
+    "densidadeTestes": 4,
+    "coberturaTestesPercentual": 100,
+    "leadTimeTestes": 2.5,
+    "leadTimeBugs": 2,
+    "leadTimeBugsProd": 2,
+    "bugsNaoProdutivos": {
+      "baixa": 5,
+      "media": 3,
+      "alta": 1,
+      "total": 10
+    },
+    "bugsProducao": {
+      "baixa": 5,
+      "media": 2,
+      "alta": 0,
+      "total": 2
+    },
+    "eficienciaQa": {
+      "escrita": 7,
+      "execucao": 7,
+      "reexecucao": 5
+    },
+    "automacao": {
+      "cenariosNovos": 5,
+      "tipoExecucao": "Smoke",
+      "execucoes": 0,
+      "tempoManual": 240
+    },
+    "healthScore": {
+      "target": 8,
+      "limits": {
+        "nonProdBugs": 20,
+        "prodBugs": 10,
+        "leadTime": 10
+      }
     }
   }
 };

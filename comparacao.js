@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let coverageChart, bugsChart, leadTimeChart, automationChart;
 
     function prepareChartData(selectedProduct) {
-        const labels = Object.keys(dadosRelatorio).sort(); // ex: ['2025-11', '2025-12']
+        const labels = Object.keys(dadosRelatorio).filter(k => /^\d{4}-\d{2}$/.test(k)).sort(); // ex: ['2025-11', '2025-12']
         const data = {
             coverageLines: [],
             coverageBranches: [],
@@ -183,7 +183,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Popula o select de produto dinamicamente
-    const firstMonth = Object.keys(dadosRelatorio)[0];
+    const firstMonth = Object.keys(dadosRelatorio).filter(k => /^\d{4}-\d{2}$/.test(k)).sort().reverse()[0];
     if (firstMonth && dadosRelatorio[firstMonth]) {
         const products = Object.keys(dadosRelatorio[firstMonth]);
         productSelect.innerHTML = products.map(p => `<option value="${p}">${p}</option>`).join('');

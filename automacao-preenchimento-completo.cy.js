@@ -28,7 +28,7 @@ describe('Automação de Preenchimento Completo por Center', () => {
                 'passRate': 99.8,
                 'bugsNaoProdutivos-baixa': 5, 'bugsNaoProdutivos-media': 2, 'bugsNaoProdutivos-alta': 1,
                 'usSprint': 10, 'casosTestePorUs': 25, 'leadTimeTestes': 2.5, 'leadTimeBugs': 4.1, 'leadTimeBugsProd': 0.5,
-                'testesAutomatizados-cenarios': 5, 'testesAutomatizados-tempoManual': 120, 'testesAutomatizados-tempoAutom': 10,
+                'testesAutomatizados-cenarios': 5, 'testesAutomatizados-execucoes': 50, 'testesAutomatizados-tempoManual': 120, 'testesAutomatizados-tempoAutom': 10,
                 'reexecucaoBugsNaoProd': 2, 'reexecucaoBugsProd': 0,
                 'eficiencia-escrita': 6, 'eficiencia-execucao': 5, 'eficiencia-reexecucao': 4
             },
@@ -38,7 +38,7 @@ describe('Automação de Preenchimento Completo por Center', () => {
                 'passRate': 100,
                 'bugsNaoProdutivos-baixa': 3, 'bugsNaoProdutivos-media': 1, 'bugsNaoProdutivos-alta': 0,
                 'usSprint': 12, 'casosTestePorUs': 30, 'leadTimeTestes': 2.1, 'leadTimeBugs': 3.5, 'leadTimeBugsProd': 0.2,
-                'testesAutomatizados-cenarios': 2, 'testesAutomatizados-tempoManual': 60, 'testesAutomatizados-tempoAutom': 5,
+                'testesAutomatizados-cenarios': 2, 'testesAutomatizados-execucoes': 60, 'testesAutomatizados-tempoManual': 60, 'testesAutomatizados-tempoAutom': 5,
                 'reexecucaoBugsNaoProd': 1, 'reexecucaoBugsProd': 0,
                 'eficiencia-escrita': 5, 'eficiencia-execucao': 4, 'eficiencia-reexecucao': 3
             },
